@@ -3,6 +3,9 @@ use anyhow::Result;
 use std::path::Path;
 use std::fs;
 use std::cmp::Ordering;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
+use futures::future::join_all;
 
 #[derive(Debug, Clone)]
 struct Package {
@@ -91,26 +94,45 @@ pub async fn handle_list(outdated: bool) -> Result<i32> {
             println!("{:<50} {:<20} {:<20} {}", "Package", "Version", "Latest", "Type");
             println!("{}", "-".repeat(100));
             
-            let mut outdated_count = 0;
+            eprintln!("Checking {} packages for updates (parallel with max 10 concurrent)...", packages.len());
+            
+            // Use parallel requests with bounded concurrency (max 10 concurrent)
+            let semaphore = Arc::new(Semaphore::new(10));
+            let mut handles = vec![];
+            
             for pkg in &packages {
-                // Fetch latest version from PyPI
-                let latest = match crate::network::get_package_metadata(&pkg.name, "latest").await {
-                    Ok(pkg_info) => pkg_info.version,
-                    Err(_) => "?".to_string(),
-                };
+                let semaphore_clone = semaphore.clone();
+                let name = pkg.name.clone();
+                let version = pkg.version.clone();
                 
-                let is_outdated = if latest != "?" {
-                    compare_versions(&pkg.version, &latest) == Ordering::Less
-                } else {
-                    false
-                };
+                let handle = tokio::spawn(async move {
+                    let _permit = semaphore_clone.acquire().await.ok();
+                    match crate::network::get_package_metadata(&name, "latest").await {
+                        Ok(pkg_info) => Some((name, version, pkg_info.version)),
+                        Err(_) => None,
+                    }
+                });
+                handles.push(handle);
+            }
+            
+            let results = join_all(handles).await;
+            let mut outdated_count = 0;
+            
+            for (idx, result) in results.iter().enumerate() {
+                if let Ok(Some((name, version, latest))) = result {
+                    if compare_versions(&version, &latest) == Ordering::Less {
+                        outdated_count += 1;
+                        println!("{:<50} {:<20} {:<20} {}", name, version, latest, "wheel");
+                    }
+                }
                 
-                if is_outdated {
-                    outdated_count += 1;
-                    println!("{:<50} {:<20} {:<20} {}", pkg.name, pkg.version, latest, "wheel");
+                // Show progress every 100 packages
+                if (idx + 1) % 100 == 0 {
+                    eprintln!("Progress: {}/{} packages checked", idx + 1, packages.len());
                 }
             }
             
+            eprintln!("\nTotal: {} outdated packages found", outdated_count);
             println!("\nTotal: {} outdated packages", outdated_count);
         } else {
             // Format: Package Version

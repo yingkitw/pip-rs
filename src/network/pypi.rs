@@ -11,8 +11,7 @@ pub async fn search_package(query: &str) -> Result<Vec<Package>> {
 
 #[allow(dead_code)]
 pub async fn get_package_releases(package_name: &str) -> Result<Vec<String>> {
-    let client = super::PackageClient::new();
-    let info = client.get_package_info(package_name).await?;
+    let info = super::GLOBAL_CLIENT.get_package_info(package_name).await?;
     
     let releases = info["releases"]
         .as_object()
@@ -24,8 +23,7 @@ pub async fn get_package_releases(package_name: &str) -> Result<Vec<String>> {
 
 #[allow(dead_code)]
 pub async fn get_latest_version(package_name: &str) -> Result<String> {
-    let client = super::PackageClient::new();
-    let info = client.get_package_info(package_name).await?;
+    let info = super::GLOBAL_CLIENT.get_package_info(package_name).await?;
     
     let version = info["info"]["version"]
         .as_str()
@@ -36,8 +34,7 @@ pub async fn get_latest_version(package_name: &str) -> Result<String> {
 }
 
 pub async fn get_package_metadata(package_name: &str, version: &str) -> Result<Package> {
-    let client = super::PackageClient::new();
-    let info = client.get_package_info(package_name).await?;
+    let info = super::GLOBAL_CLIENT.get_package_info(package_name).await?;
     
     let pkg_info = &info["info"];
     
