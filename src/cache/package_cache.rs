@@ -1,8 +1,7 @@
 /// Package cache for storing downloaded packages and metadata
 use anyhow::Result;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct PackageCache {
     cache_dir: PathBuf,

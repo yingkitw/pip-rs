@@ -5,4 +5,3 @@ pub mod metadata;
 
 pub use package::Package;
 pub use requirement::{Requirement, VersionSpec, VersionOp};
-pub use metadata::Metadata;

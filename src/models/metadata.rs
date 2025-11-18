@@ -19,6 +19,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    #[allow(dead_code)]
     pub fn new(name: String, version: String) -> Self {
         Self {
             name,

@@ -1,8 +1,7 @@
 /// Configuration file parsing and management
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Config {

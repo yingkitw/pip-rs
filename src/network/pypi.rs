@@ -9,6 +9,7 @@ pub async fn search_package(query: &str) -> Result<Vec<Package>> {
     Ok(Vec::new())
 }
 
+#[allow(dead_code)]
 pub async fn get_package_releases(package_name: &str) -> Result<Vec<String>> {
     let client = super::PackageClient::new();
     let info = client.get_package_info(package_name).await?;
@@ -21,6 +22,7 @@ pub async fn get_package_releases(package_name: &str) -> Result<Vec<String>> {
     Ok(releases)
 }
 
+#[allow(dead_code)]
 pub async fn get_latest_version(package_name: &str) -> Result<String> {
     let client = super::PackageClient::new();
     let info = client.get_package_info(package_name).await?;

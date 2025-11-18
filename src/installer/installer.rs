@@ -3,9 +3,10 @@ use crate::models::Package;
 use crate::network::PackageClient;
 use super::{SitePackages, wheel::WheelFile};
 use anyhow::{Result, anyhow};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tempfile::TempDir;
 
+#[allow(dead_code)]
 pub struct PackageInstaller {
     client: PackageClient,
     site_packages: SitePackages,
@@ -23,7 +24,7 @@ impl PackageInstaller {
         println!("Installing {} {}", package.name, package.version);
 
         // Create temporary directory for downloads
-        let temp_dir = TempDir::new()?;
+        let _ = TempDir::new()?;
 
         // TODO: Download wheel file
         // let wheel_url = self.find_wheel_url(package).await?;

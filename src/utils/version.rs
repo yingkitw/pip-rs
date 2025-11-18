@@ -38,6 +38,7 @@ impl Version {
         })
     }
 
+    #[allow(dead_code)]
     pub fn compare(&self, other: &Version) -> Ordering {
         for i in 0..self.parts.len().max(other.parts.len()) {
             let a = self.parts.get(i).copied().unwrap_or(0);

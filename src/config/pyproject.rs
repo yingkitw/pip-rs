@@ -4,6 +4,7 @@ use std::path::Path;
 use std::fs;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PyProject {
     path: std::path::PathBuf,
     content: String,
@@ -88,7 +89,7 @@ impl PyProject {
     }
 
     /// Helper to extract values
-    fn get_value(&self, section: &str, key: &str) -> Option<String> {
+    fn get_value(&self, _section: &str, key: &str) -> Option<String> {
         let pattern = format!("{} = \"", key);
         
         if let Some(start) = self.content.find(&pattern) {

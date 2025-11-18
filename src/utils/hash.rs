@@ -2,6 +2,7 @@
 use anyhow::Result;
 use std::path::Path;
 
+#[allow(dead_code)]
 pub async fn verify_hash(file_path: &Path, expected_hash: &str, algorithm: &str) -> Result<bool> {
     // TODO: Implement hash verification
     // This would read the file and compute the hash
@@ -9,6 +10,7 @@ pub async fn verify_hash(file_path: &Path, expected_hash: &str, algorithm: &str)
     Ok(true)
 }
 
+#[allow(dead_code)]
 pub fn parse_hash_string(s: &str) -> Result<(String, String)> {
     let parts: Vec<&str> = s.split('=').collect();
     if parts.len() != 2 {

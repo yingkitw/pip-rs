@@ -118,6 +118,7 @@ impl Resolver {
         }
     }
 
+    #[allow(dead_code)]
     pub fn clear_cache(&mut self) {
         self.cache.clear();
         self.visited.clear();

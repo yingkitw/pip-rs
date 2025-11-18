@@ -1,9 +1,8 @@
-/// Upgrade command implementation
-use crate::models::Package;
 use crate::network::get_package_metadata;
 use crate::utils::Version;
 use anyhow::Result;
 
+#[allow(dead_code)]
 pub async fn handle_upgrade(package_name: &str, _target: Option<&str>) -> Result<()> {
     println!("Checking for updates for package: {}", package_name);
 
@@ -30,6 +29,7 @@ pub async fn handle_upgrade(package_name: &str, _target: Option<&str>) -> Result
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn handle_upgrade_all() -> Result<()> {
     println!("Checking for updates for all packages...");
     

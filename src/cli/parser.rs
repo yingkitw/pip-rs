@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct InstallOptions {
     pub packages: Vec<String>,
     pub requirements: Option<PathBuf>,
@@ -12,6 +13,7 @@ pub struct InstallOptions {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct UninstallOptions {
     pub packages: Vec<String>,
     pub yes: bool,

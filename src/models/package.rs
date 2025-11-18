@@ -32,6 +32,7 @@ pub struct Distribution {
 }
 
 impl Package {
+    #[allow(dead_code)]
     pub fn new(name: String, version: String) -> Self {
         Self {
             name,
@@ -46,11 +47,13 @@ impl Package {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_summary(mut self, summary: String) -> Self {
         self.summary = Some(summary);
         self
     }
 
+    #[allow(dead_code)]
     pub fn with_requires(mut self, requires: Vec<String>) -> Self {
         self.requires_dist = requires;
         self

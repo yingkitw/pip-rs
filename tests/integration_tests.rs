@@ -1,5 +1,3 @@
-/// Integration tests for pip-rs
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[test]

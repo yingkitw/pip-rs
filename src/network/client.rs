@@ -15,6 +15,7 @@ impl PackageClient {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_base_url(mut self, url: String) -> Self {
         self.base_url = url;
         self
@@ -27,6 +28,7 @@ impl PackageClient {
         Ok(data)
     }
 
+    #[allow(dead_code)]
     pub async fn download_package(&self, url: &str) -> Result<bytes::Bytes> {
         let response = self.client.get(url).send().await?;
         let data = response.bytes().await?;

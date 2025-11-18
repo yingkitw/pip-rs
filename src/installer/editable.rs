@@ -1,6 +1,6 @@
 /// Editable package installation support
 use anyhow::{Result, anyhow};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::fs;
 
 #[derive(Debug, Clone)]
