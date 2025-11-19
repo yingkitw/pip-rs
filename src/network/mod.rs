@@ -3,7 +3,7 @@ pub mod pypi;
 pub mod client;
 
 pub use pypi::*;
-pub use client::*;
+pub use client::PackageClient;
 
 use lazy_static::lazy_static;
 

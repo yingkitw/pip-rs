@@ -9,8 +9,13 @@ pub struct PackageClient {
 
 impl PackageClient {
     pub fn new() -> Self {
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+        
         Self {
-            client: Client::new(),
+            client,
             base_url: "https://pypi.org/pypi".to_string(),
         }
     }

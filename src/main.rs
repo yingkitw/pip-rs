@@ -63,6 +63,12 @@ enum Commands {
         #[arg(short, long)]
         package: Option<String>,
     },
+    /// Update packages (check for outdated and show upgrade instructions)
+    #[command(alias = "upgrade")]
+    Update {
+        /// Package names to update (if empty, update all outdated)
+        packages: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -87,6 +93,16 @@ async fn main() {
         Commands::Show { package } => commands::show::handle_show(&package).await,
         Commands::Search { query } => commands::search::handle_search(&query).await,
         Commands::Check { package } => commands::check::handle_check(package).await,
+        Commands::Update { packages } => {
+            if packages.is_empty() {
+                // Update all outdated packages
+                commands::upgrade::handle_upgrade_all().await
+            } else {
+                // Update specific packages (not implemented yet)
+                eprintln!("Updating specific packages not yet implemented");
+                Ok(1)
+            }
+        }
     };
 
     match result {

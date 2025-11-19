@@ -34,6 +34,9 @@ pub async fn get_latest_version(package_name: &str) -> Result<String> {
 }
 
 pub async fn get_package_metadata(package_name: &str, version: &str) -> Result<Package> {
+    // TODO: Implement disk caching
+    // For now, fetch directly from PyPI
+    
     let info = super::GLOBAL_CLIENT.get_package_info(package_name).await?;
     
     let pkg_info = &info["info"];
@@ -63,6 +66,8 @@ pub async fn get_package_metadata(package_name: &str, version: &str) -> Result<P
             })
             .unwrap_or_default(),
     };
+    
+    // TODO: Cache the package for future requests
     
     Ok(package)
 }

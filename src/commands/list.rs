@@ -4,7 +4,7 @@ use std::path::Path;
 use std::fs;
 use std::cmp::Ordering;
 use std::sync::Arc;
-use tokio::sync::Semaphore;
+use tokio::sync::{Semaphore, mpsc};
 use futures::future::join_all;
 
 #[derive(Debug, Clone)]
@@ -94,45 +94,68 @@ pub async fn handle_list(outdated: bool) -> Result<i32> {
             println!("{:<50} {:<20} {:<20} {}", "Package", "Version", "Latest", "Type");
             println!("{}", "-".repeat(100));
             
-            eprintln!("Checking {} packages for updates (parallel with max 10 concurrent)...", packages.len());
+            eprintln!("Checking {} packages for updates (real-time streaming)...", packages.len());
             
-            // Use parallel requests with bounded concurrency (max 10 concurrent)
-            let semaphore = Arc::new(Semaphore::new(10));
-            let mut handles = vec![];
+            // Create channel for real-time result streaming
+            let (tx, mut rx) = mpsc::channel(100);
+            let total_packages = packages.len();
             
-            for pkg in &packages {
-                let semaphore_clone = semaphore.clone();
-                let name = pkg.name.clone();
-                let version = pkg.version.clone();
+            // Spawn task to fetch packages
+            let packages_clone = packages.clone();
+            tokio::spawn(async move {
+                let semaphore = Arc::new(Semaphore::new(5));
+                let mut handles = vec![];
                 
-                let handle = tokio::spawn(async move {
-                    let _permit = semaphore_clone.acquire().await.ok();
-                    match crate::network::get_package_metadata(&name, "latest").await {
-                        Ok(pkg_info) => Some((name, version, pkg_info.version)),
-                        Err(_) => None,
-                    }
-                });
-                handles.push(handle);
-            }
+                // Spawn all tasks at once for real-time streaming
+                for (_idx, pkg) in packages_clone.iter().enumerate() {
+                    let semaphore_clone = semaphore.clone();
+                    let tx_clone = tx.clone();
+                    let name = pkg.name.clone();
+                    let version = pkg.version.clone();
+                    
+                    let handle = tokio::spawn(async move {
+                        let _permit = semaphore_clone.acquire().await.ok();
+                        match crate::network::get_package_metadata(&name, "latest").await {
+                            Ok(pkg_info) => {
+                                let is_outdated = compare_versions(&version, &pkg_info.version) == Ordering::Less;
+                                let _ = tx_clone.send((name, version, pkg_info.version, is_outdated)).await;
+                            }
+                            Err(_) => {
+                                // Silently skip failed requests
+                            }
+                        }
+                    });
+                    handles.push(handle);
+                }
+                
+                // Wait for all tasks to complete
+                let _ = join_all(handles).await;
+            });
             
-            let results = join_all(handles).await;
+            // Receive and display results in real-time
             let mut outdated_count = 0;
+            let mut checked_count = 0;
             
-            for (idx, result) in results.iter().enumerate() {
-                if let Ok(Some((name, version, latest))) = result {
-                    if compare_versions(&version, &latest) == Ordering::Less {
-                        outdated_count += 1;
-                        println!("{:<50} {:<20} {:<20} {}", name, version, latest, "wheel");
-                    }
+            while let Some((name, version, latest, is_outdated)) = rx.recv().await {
+                checked_count += 1;
+                
+                if is_outdated {
+                    outdated_count += 1;
+                    println!("{:<50} {:<20} {:<20} {}", name, version, latest, "wheel");
                 }
                 
                 // Show progress every 100 packages
-                if (idx + 1) % 100 == 0 {
-                    eprintln!("Progress: {}/{} packages checked", idx + 1, packages.len());
+                if checked_count % 100 == 0 {
+                    eprintln!("Progress: {}/{} packages checked", checked_count, total_packages);
+                }
+                
+                // Break if all packages checked
+                if checked_count >= total_packages {
+                    break;
                 }
             }
             
-            eprintln!("\nTotal: {} outdated packages found", outdated_count);
+            eprintln!("Progress: {}/{} packages checked", total_packages, total_packages);
             println!("\nTotal: {} outdated packages", outdated_count);
         } else {
             // Format: Package Version
