@@ -6,3 +6,8 @@ pub mod show;
 pub mod search;
 pub mod check;
 pub mod upgrade;
+pub mod freeze;
+pub mod download;
+pub mod lock;
+pub mod debug;
+pub mod completion;

@@ -9,3 +9,4 @@ pub mod installer;
 pub mod cache;
 pub mod venv;
 pub mod config;
+pub mod errors;

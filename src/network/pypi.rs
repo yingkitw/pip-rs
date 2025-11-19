@@ -1,12 +1,55 @@
 /// PyPI API interactions
 use crate::models::Package;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub async fn search_package(query: &str) -> Result<Vec<Package>> {
     // TODO: Implement PyPI search API
     // This would call the PyPI JSON API
     let _ = query;
     Ok(Vec::new())
+}
+
+/// Find the best wheel URL for a package version
+pub async fn find_wheel_url(package_name: &str, version: &str) -> Result<String> {
+    let info = super::GLOBAL_CLIENT.get_package_info(package_name).await?;
+    
+    let urls = info["urls"]
+        .as_array()
+        .ok_or_else(|| anyhow!("No URLs found for package"))?;
+    
+    // Prefer pure Python wheels (py3-none-any), then platform-specific
+    for url_info in urls {
+        let filename = url_info["filename"]
+            .as_str()
+            .ok_or_else(|| anyhow!("No filename in URL info"))?;
+        
+        // Look for .whl files
+        if filename.ends_with(".whl") {
+            // Prefer pure Python wheels
+            if filename.contains("py3-none-any") {
+                let url = url_info["url"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("No URL in URL info"))?;
+                return Ok(url.to_string());
+            }
+        }
+    }
+    
+    // If no pure Python wheel found, get any wheel
+    for url_info in urls {
+        let filename = url_info["filename"]
+            .as_str()
+            .ok_or_else(|| anyhow!("No filename in URL info"))?;
+        
+        if filename.ends_with(".whl") {
+            let url = url_info["url"]
+                .as_str()
+                .ok_or_else(|| anyhow!("No URL in URL info"))?;
+            return Ok(url.to_string());
+        }
+    }
+    
+    Err(anyhow!("No wheel found for {} {}", package_name, version))
 }
 
 #[allow(dead_code)]

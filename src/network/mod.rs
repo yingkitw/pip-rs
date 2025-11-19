@@ -1,9 +1,11 @@
 /// Network operations and PyPI communication
 pub mod pypi;
 pub mod client;
+pub mod index;
 
 pub use pypi::*;
 pub use client::PackageClient;
+pub use index::{IndexManager, IndexConfig, parse_index_config};
 
 use lazy_static::lazy_static;
 

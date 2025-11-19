@@ -4,14 +4,19 @@ mod models;
 mod network;
 mod resolver;
 mod utils;
+mod installer;
+mod cache;
+mod venv;
+mod config;
+mod errors;
 
 use clap::{Parser, Subcommand};
 use std::process;
 
 #[derive(Parser)]
 #[command(name = "pip")]
-#[command(about = "The Python package installer", long_about = None)]
-#[command(version = "0.1.0")]
+#[command(about = "A high-performance Rust implementation of the Python package installer", long_about = None)]
+#[command(version = "1.0.0-rc.1")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -69,6 +74,42 @@ enum Commands {
         /// Package names to update (if empty, update all outdated)
         packages: Vec<String>,
     },
+    /// Generate requirements.txt from installed packages
+    Freeze {
+        /// Output file (if not specified, prints to stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+    },
+    /// Download packages without installing
+    Download {
+        /// Package names or requirements to download
+        packages: Vec<String>,
+
+        /// Requirements file
+        #[arg(short, long)]
+        requirements: Option<String>,
+
+        /// Destination directory for downloads
+        #[arg(short, long)]
+        destination: Option<String>,
+    },
+    /// Generate lock file for reproducible installs
+    Lock {
+        /// Requirements file
+        #[arg(short, long)]
+        requirements: Option<String>,
+
+        /// Output lock file path
+        #[arg(short, long)]
+        output: Option<String>,
+    },
+    /// Display debug information
+    Debug,
+    /// Generate shell completion
+    Completion {
+        /// Shell type (bash, zsh, fish, powershell)
+        shell: String,
+    },
 }
 
 #[tokio::main]
@@ -103,12 +144,25 @@ async fn main() {
                 Ok(1)
             }
         }
+        Commands::Freeze { output } => commands::freeze::handle_freeze(output).await,
+        Commands::Download {
+            packages,
+            requirements,
+            destination,
+        } => commands::download::handle_download(packages, requirements, destination).await,
+        Commands::Lock {
+            requirements,
+            output,
+        } => commands::lock::handle_lock(requirements, output).await,
+        Commands::Debug => commands::debug::handle_debug().await,
+        Commands::Completion { shell } => commands::completion::handle_completion(shell).await,
     };
 
     match result {
         Ok(code) => process::exit(code),
         Err(e) => {
             eprintln!("Error: {}", e);
+            eprintln!("Run with RUST_LOG=debug for more details");
             process::exit(1);
         }
     }

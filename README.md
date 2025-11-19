@@ -9,13 +9,14 @@ pip-rs is a complete reimplementation of the Python package installer (pip) in R
 ## Features
 
 ### Core Functionality
-- ✅ Package installation from PyPI
+- ✅ Package installation from PyPI with wheel download
 - ✅ Dependency resolution with version constraints
 - ✅ Virtual environment creation and management
 - ✅ Package listing and information display
-- ✅ Package uninstallation
+- ✅ Package uninstallation with confirmation
 - ✅ Editable installs (.pth files)
-- ✅ Wheel file handling
+- ✅ Wheel file handling and extraction
+- ✅ Requirements file generation (`pip freeze`)
 
 ### Advanced Features
 - ✅ Real-time package update checking (`pip list --outdated`)
@@ -24,8 +25,18 @@ pip-rs is a complete reimplementation of the Python package installer (pip) in R
 - ✅ Animated progress indication
 - ✅ Connection pooling for performance
 - ✅ Parallel network requests (5 concurrent)
-- ✅ Disk caching for package metadata
+- ✅ Disk caching for package metadata (infrastructure ready)
 - ✅ Configuration file support (pip.ini/pip.conf)
+- ✅ Network error retry with exponential backoff
+- ✅ Timeout handling (30s request, 10s connect)
+
+### Production Features (Phase 7)
+- ✅ PEP 508 environment marker evaluation
+- ✅ Extras support (`package[extra]`)
+- ✅ Lock file generation for reproducible installs
+- ✅ Multiple index support with fallback
+- ✅ Debug command for system information
+- ✅ Shell completion (bash, zsh, fish, powershell)
 
 ## Quick Start
 
@@ -36,6 +47,14 @@ cargo build --release
 
 ### Commands
 ```bash
+# Install packages
+pip install package_name
+pip install -r requirements.txt
+
+# Uninstall packages
+pip uninstall package_name
+pip uninstall package_name --yes  # Skip confirmation
+
 # List installed packages
 pip list
 
@@ -45,17 +64,15 @@ pip list --outdated
 # Update all outdated packages
 pip update
 
-# Install a package
-pip install package_name
-
-# Uninstall a package
-pip uninstall package_name
-
 # Show package information
 pip show package_name
 
 # Search for packages
 pip search query
+
+# Generate requirements.txt from installed packages
+pip freeze
+pip freeze -o requirements.txt
 ```
 
 ## Testing
@@ -70,6 +87,8 @@ cargo test --lib
 - **Parallel Requests**: 5 concurrent PyPI requests for faster package checking
 - **Disk Caching**: 24-hour cache for package metadata (10-20x faster on repeated runs)
 - **Real-Time Streaming**: Results displayed immediately as they're fetched
+- **Network Resilience**: Automatic retry with exponential backoff (3 attempts)
+- **Timeout Protection**: 30s request timeout, 10s connection timeout
 
 ## Project Structure
 

@@ -1,5 +1,6 @@
 /// Uninstall command implementation
 use anyhow::Result;
+use std::io::{self, BufRead};
 
 pub async fn handle_uninstall(packages: Vec<String>, yes: bool) -> Result<i32> {
     if packages.is_empty() {
@@ -12,11 +13,46 @@ pub async fn handle_uninstall(packages: Vec<String>, yes: bool) -> Result<i32> {
         println!("  - {}", pkg);
     }
 
+    // Get confirmation if not --yes flag
     if !yes {
-        println!("Proceed (y/n)? ");
-        // TODO: Read user input
+        println!("\nProceed (y/n)? ");
+        let stdin = io::stdin();
+        let mut line = String::new();
+        stdin.lock().read_line(&mut line)?;
+        
+        let response = line.trim().to_lowercase();
+        if response != "y" && response != "yes" {
+            println!("Aborted");
+            return Ok(0);
+        }
     }
 
-    println!("Successfully uninstalled {} packages", packages.len());
+    // Uninstall packages
+    let site_packages = crate::installer::SitePackages::default()?;
+    let installer = crate::installer::PackageInstaller::new(site_packages);
+    
+    let mut uninstalled_count = 0;
+    let mut failed_count = 0;
+
+    for pkg_name in packages {
+        match installer.uninstall(&pkg_name).await {
+            Ok(_) => {
+                println!("✓ Successfully uninstalled {}", pkg_name);
+                uninstalled_count += 1;
+            }
+            Err(e) => {
+                eprintln!("✗ Failed to uninstall {}: {}", pkg_name, e);
+                failed_count += 1;
+            }
+        }
+    }
+
+    println!("\nUninstall complete!");
+    println!("  Successfully uninstalled: {}", uninstalled_count);
+    if failed_count > 0 {
+        println!("  Failed: {}", failed_count);
+        return Ok(1);
+    }
+
     Ok(0)
 }

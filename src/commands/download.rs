@@ -1,15 +1,14 @@
-/// Install command implementation
+/// Download command - download packages without installing
 use anyhow::{Result, anyhow};
 use std::path::Path;
-use tempfile::TempDir;
 
-pub async fn handle_install(
+pub async fn handle_download(
     packages: Vec<String>,
     requirements: Option<String>,
-    _target: Option<String>,
+    destination: Option<String>,
 ) -> Result<i32> {
     if packages.is_empty() && requirements.is_none() {
-        eprintln!("ERROR: You must give at least one requirement to install (see \"pip help install\")");
+        eprintln!("ERROR: You must give at least one requirement to download");
         return Ok(1);
     }
 
@@ -38,11 +37,7 @@ pub async fn handle_install(
     for req_str in all_requirements {
         match req_str.parse::<crate::models::Requirement>() {
             Ok(req) => {
-                if req.extras.is_empty() {
-                    println!("  - {}", req.name);
-                } else {
-                    println!("  - {}[{}]", req.name, req.extras.join(","));
-                }
+                println!("  - {}", req.name);
                 parsed_reqs.push(req);
             }
             Err(e) => {
@@ -66,28 +61,35 @@ pub async fn handle_install(
         println!("  - {} {}", pkg.name, pkg.version);
     }
 
-    // Download and install packages
-    println!("\nDownloading and installing packages...");
+    // Determine destination directory
+    let dest_dir = destination.unwrap_or_else(|| ".".to_string());
+    let dest_path = Path::new(&dest_dir);
     
-    let temp_dir = TempDir::new()?;
-    let mut installed_count = 0;
+    if !dest_path.exists() {
+        std::fs::create_dir_all(dest_path)?;
+    }
+
+    // Download packages
+    println!("\nDownloading packages to {}...", dest_dir);
+    
+    let mut downloaded_count = 0;
     let mut failed_count = 0;
 
     for pkg in &resolved {
-        match install_package(pkg, temp_dir.path()).await {
-            Ok(_) => {
-                println!("✓ Successfully installed {} {}", pkg.name, pkg.version);
-                installed_count += 1;
+        match download_package(pkg, dest_path).await {
+            Ok(filename) => {
+                println!("✓ Downloaded {} to {}", pkg.name, filename);
+                downloaded_count += 1;
             }
             Err(e) => {
-                eprintln!("✗ Failed to install {} {}: {}", pkg.name, pkg.version, e);
+                eprintln!("✗ Failed to download {} {}: {}", pkg.name, pkg.version, e);
                 failed_count += 1;
             }
         }
     }
 
-    println!("\nInstallation complete!");
-    println!("  Successfully installed: {}", installed_count);
+    println!("\nDownload complete!");
+    println!("  Successfully downloaded: {}", downloaded_count);
     if failed_count > 0 {
         println!("  Failed: {}", failed_count);
         return Ok(1);
@@ -96,8 +98,8 @@ pub async fn handle_install(
     Ok(0)
 }
 
-/// Install a single package by downloading and extracting its wheel
-async fn install_package(pkg: &crate::models::Package, temp_dir: &Path) -> Result<()> {
+/// Download a single package wheel
+async fn download_package(pkg: &crate::models::Package, dest_dir: &Path) -> Result<String> {
     // Find wheel URL
     let wheel_url = crate::network::find_wheel_url(&pkg.name, &pkg.version).await?;
     
@@ -105,16 +107,15 @@ async fn install_package(pkg: &crate::models::Package, temp_dir: &Path) -> Resul
     eprintln!("  Downloading {} from {}", pkg.name, wheel_url);
     let wheel_data = crate::network::PackageClient::new().download_package(&wheel_url).await?;
     
-    // Save wheel to temp directory
-    let wheel_filename = format!("{}-{}.whl", pkg.name, pkg.version);
-    let wheel_path = temp_dir.join(&wheel_filename);
+    // Extract filename from URL
+    let filename = wheel_url
+        .split('/')
+        .last()
+        .ok_or_else(|| anyhow!("Invalid wheel URL"))?;
+    
+    // Save wheel to destination
+    let wheel_path = dest_dir.join(filename);
     std::fs::write(&wheel_path, wheel_data)?;
     
-    // Extract and install wheel
-    let wheel = crate::installer::wheel::WheelFile::new(wheel_path)?;
-    let site_packages = crate::installer::SitePackages::default()?;
-    let installer = crate::installer::PackageInstaller::new(site_packages);
-    installer.install_wheel(&wheel).await?;
-    
-    Ok(())
+    Ok(filename.to_string())
 }

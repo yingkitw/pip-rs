@@ -1,6 +1,10 @@
-/// HTTP client for package operations
-use anyhow::Result;
+/// HTTP client for package operations with retry logic
+use anyhow::{Result, anyhow};
 use reqwest::Client;
+use std::time::Duration;
+
+const MAX_RETRIES: u32 = 3;
+const RETRY_DELAY_MS: u64 = 500;
 
 pub struct PackageClient {
     client: Client,
@@ -10,7 +14,8 @@ pub struct PackageClient {
 impl PackageClient {
     pub fn new() -> Self {
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_else(|_| Client::new());
         
@@ -26,18 +31,75 @@ impl PackageClient {
         self
     }
 
+    /// Get package info with retry logic
     pub async fn get_package_info(&self, package_name: &str) -> Result<serde_json::Value> {
         let url = format!("{}/{}/json", self.base_url, package_name);
-        let response = self.client.get(&url).send().await?;
-        let data = response.json().await?;
-        Ok(data)
+        self.get_with_retry(&url).await
     }
 
-    #[allow(dead_code)]
+    /// Download package with retry logic and progress
     pub async fn download_package(&self, url: &str) -> Result<bytes::Bytes> {
-        let response = self.client.get(url).send().await?;
-        let data = response.bytes().await?;
-        Ok(data)
+        self.download_with_retry(url).await
+    }
+
+    /// Get with exponential backoff retry
+    async fn get_with_retry(&self, url: &str) -> Result<serde_json::Value> {
+        let mut last_error = None;
+        
+        for attempt in 0..MAX_RETRIES {
+            match self.client.get(url).send().await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        return response.json().await.map_err(|e| anyhow!("Failed to parse JSON: {}", e));
+                    } else if response.status().is_client_error() {
+                        return Err(anyhow!("Client error: {}", response.status()));
+                    }
+                    // Server error, retry
+                    last_error = Some(anyhow!("Server error: {}", response.status()));
+                }
+                Err(e) => {
+                    last_error = Some(anyhow!("Network error: {}", e));
+                }
+            }
+            
+            if attempt < MAX_RETRIES - 1 {
+                let delay = Duration::from_millis(RETRY_DELAY_MS * 2_u64.pow(attempt));
+                eprintln!("Retry attempt {} after {:?}...", attempt + 1, delay);
+                tokio::time::sleep(delay).await;
+            }
+        }
+        
+        Err(last_error.unwrap_or_else(|| anyhow!("Failed to fetch after {} retries", MAX_RETRIES)))
+    }
+
+    /// Download with exponential backoff retry
+    async fn download_with_retry(&self, url: &str) -> Result<bytes::Bytes> {
+        let mut last_error = None;
+        
+        for attempt in 0..MAX_RETRIES {
+            match self.client.get(url).send().await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        return response.bytes().await.map_err(|e| anyhow!("Failed to read response: {}", e));
+                    } else if response.status().is_client_error() {
+                        return Err(anyhow!("Client error: {}", response.status()));
+                    }
+                    // Server error, retry
+                    last_error = Some(anyhow!("Server error: {}", response.status()));
+                }
+                Err(e) => {
+                    last_error = Some(anyhow!("Network error: {}", e));
+                }
+            }
+            
+            if attempt < MAX_RETRIES - 1 {
+                let delay = Duration::from_millis(RETRY_DELAY_MS * 2_u64.pow(attempt));
+                eprintln!("Retry attempt {} after {:?}...", attempt + 1, delay);
+                tokio::time::sleep(delay).await;
+            }
+        }
+        
+        Err(last_error.unwrap_or_else(|| anyhow!("Failed to download after {} retries", MAX_RETRIES)))
     }
 }
 

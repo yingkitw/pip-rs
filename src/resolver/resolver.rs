@@ -1,11 +1,12 @@
 /// Dependency resolution algorithm
-use crate::models::{Package, Requirement, VersionOp};
+use crate::models::{Package, Requirement, VersionOp, Marker, Environment};
 use anyhow::Result;
 use std::collections::{HashMap, VecDeque, HashSet};
 
 pub struct Resolver {
     cache: HashMap<String, Package>,
     visited: HashSet<String>,
+    environment: Environment,
 }
 
 impl Resolver {
@@ -13,6 +14,15 @@ impl Resolver {
         Self {
             cache: HashMap::new(),
             visited: HashSet::new(),
+            environment: Environment::current(),
+        }
+    }
+
+    pub fn with_environment(environment: Environment) -> Self {
+        Self {
+            cache: HashMap::new(),
+            visited: HashSet::new(),
+            environment,
         }
     }
 
@@ -31,9 +41,19 @@ impl Resolver {
                 Ok(package) => {
                     // Check version constraints
                     if self.satisfies_version(&package.version, &req.specs) {
-                        // Parse dependencies
+                        // Parse dependencies, filtering by environment markers
                         for dep_str in &package.requires_dist {
                             if let Ok(dep_req) = dep_str.parse::<Requirement>() {
+                                // Check if dependency applies to current environment
+                                if let Some(marker_str) = &dep_req.marker {
+                                    if let Ok(marker) = Marker::parse(marker_str) {
+                                        if !marker.evaluate(&self.environment) {
+                                            // Skip this dependency - doesn't apply to current environment
+                                            continue;
+                                        }
+                                    }
+                                }
+
                                 if !self.visited.contains(&dep_req.name) {
                                     queue.push_back(dep_req);
                                 }

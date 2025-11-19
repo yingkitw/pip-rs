@@ -108,52 +108,15 @@ where
             let _ = join_all(handles).await;
         });
 
-        // Scan and upgrade in real-time as packages are found
+        // Collect all outdated packages first
         let mut checked_count = 0;
-        let mut upgrade_tasks = vec![];
-        let upgrade_semaphore = Arc::new(Semaphore::new(self.config.concurrency));
-
-        println!("📊 Scanning and upgrading packages in real-time:\n");
-        println!("{:<50} {:<20} {:<20} {}", "Package", "Current", "Latest", "Status");
-        println!("{}", "-".repeat(100));
-
+        let mut outdated_packages = Vec::new();
+        
         while let Some((name, version, latest, is_outdated)) = rx.recv().await {
             checked_count += 1;
-
+            
             if is_outdated {
-                // Check dependencies before upgrading
-                let reporter = self.reporter.clone();
-                let name_clone = name.clone();
-                let latest_clone = latest.clone();
-                
-                // Check for unmet dependencies
-                if let Ok(unmet) = super::conflict::DefaultConflictDetector.check_dependencies(&name, &latest).await {
-                    if !unmet.is_empty() {
-                        reporter.report_unmet_dependencies(&name, &unmet);
-                    }
-                }
-
-                // Spawn upgrade task immediately
-                let sem = upgrade_semaphore.clone();
-                let installer = self.installer.clone();
-                let version_clone = version.clone();
-
-                let task = tokio::spawn(async move {
-                    let _permit = sem.acquire().await.ok();
-                    installer.upgrade_parallel(
-                        vec![(name_clone, version_clone, latest_clone)],
-                        1
-                    ).await.into_iter().next().unwrap_or_else(|| {
-                        UpgradeResult {
-                            name: name.clone(),
-                            current_version: version,
-                            latest_version: latest,
-                            success: false,
-                            error_msg: Some("Unknown error".to_string()),
-                        }
-                    })
-                });
-                upgrade_tasks.push(task);
+                outdated_packages.push((name, version, latest));
             } else {
                 self.reporter
                     .report_scanning(checked_count, total_packages, &name, false);
@@ -168,24 +131,27 @@ where
         eprintln!("\r{}", " ".repeat(100));
         eprintln!("\r[100%] [{}] {}/{} | Scan complete!", "█".repeat(20), total_packages, total_packages);
 
-        if upgrade_tasks.is_empty() {
-            println!("✓ All packages are up-to-date!\n");
+        if outdated_packages.is_empty() {
+            println!("\n✓ All packages are up-to-date!\n");
             return Ok(0);
         }
 
-        // Wait for all upgrade tasks to complete
-        let results = futures::future::join_all(upgrade_tasks).await;
-        let (upgraded_count, failed_count) = results.iter().fold((0, 0), |(up, fail), task_result| {
-            if let Ok(result) = task_result {
-                let status = if result.success { "✓ UPGRADED" } else { "✗ FAILED" };
-                println!("{:<50} {:<20} {:<20} {}", 
-                    result.name, result.current_version, result.latest_version, status);
-                
-                if result.success {
-                    (up + 1, fail)
-                } else {
-                    (up, fail + 1)
-                }
+        // Display outdated packages found
+        println!("\n📋 Found {} outdated packages. Starting upgrade...\n", outdated_packages.len());
+        println!("{:<50} {:<20} {:<20} {}", "Package", "Current", "Latest", "Status");
+        println!("{}", "-".repeat(100));
+
+        // Upgrade all packages in parallel
+        let results = self.installer.upgrade_parallel(outdated_packages, self.config.concurrency).await;
+        
+        // Display results
+        let (upgraded_count, failed_count) = results.iter().fold((0, 0), |(up, fail), result| {
+            let status = if result.success { "✓ UPGRADED" } else { "✗ FAILED" };
+            println!("{:<50} {:<20} {:<20} {}", 
+                result.name, result.current_version, result.latest_version, status);
+            
+            if result.success {
+                (up + 1, fail)
             } else {
                 (up, fail + 1)
             }
