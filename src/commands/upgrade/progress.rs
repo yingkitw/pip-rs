@@ -1,6 +1,7 @@
 /// Progress indication with animation for package updates
 use std::io::Write;
 
+#[allow(dead_code)]
 pub struct ProgressIndicator {
     total: usize,
     current: usize,
@@ -9,6 +10,7 @@ pub struct ProgressIndicator {
 }
 
 impl ProgressIndicator {
+    #[allow(dead_code)]
     pub fn new(total: usize) -> Self {
         Self {
             total,
@@ -18,6 +20,7 @@ impl ProgressIndicator {
         }
     }
 
+    #[allow(dead_code)]
     pub fn update(&mut self, package_name: &str, is_upgrading: bool) {
         self.current += 1;
         let percent = (self.current as f64 / self.total as f64 * 100.0) as u32;
@@ -34,11 +37,13 @@ impl ProgressIndicator {
         let _ = std::io::stderr().flush();
     }
 
+    #[allow(dead_code)]
     pub fn finish(&self) {
         let bar = self.format_bar(100);
         eprintln!("\r✓ [{}] 100% | {}/{} | Complete!", bar, self.total, self.total);
     }
 
+    #[allow(dead_code)]
     fn format_bar(&self, percent: u32) -> String {
         let width: usize = 30;
         let filled = (width as f64 * percent as f64 / 100.0) as usize;

@@ -1,13 +1,6 @@
 /// Package installation/upgrade functionality
 use std::process::Command;
-
-pub struct UpgradeResult {
-    pub name: String,
-    pub current_version: String,
-    pub latest_version: String,
-    pub success: bool,
-    pub error_msg: Option<String>,
-}
+use super::traits::UpgradeResult;
 
 pub fn upgrade_package(name: &str, current: &str, latest: &str) -> UpgradeResult {
     let package_spec = format!("{}=={}", name, latest);
@@ -40,4 +33,29 @@ pub fn upgrade_package(name: &str, current: &str, latest: &str) -> UpgradeResult
             }
         }
     }
+}
+
+/// Upgrade multiple packages in parallel with bounded concurrency
+pub async fn upgrade_packages_parallel(
+    packages: Vec<(String, String, String)>,
+    concurrency: usize,
+) -> Vec<UpgradeResult> {
+    use std::sync::Arc;
+    use tokio::sync::Semaphore;
+    use futures::future::join_all;
+
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+    let mut handles = vec![];
+
+    for (name, current, latest) in packages {
+        let sem = semaphore.clone();
+        let handle = tokio::spawn(async move {
+            let _permit = sem.acquire().await.ok();
+            upgrade_package(&name, &current, &latest)
+        });
+        handles.push(handle);
+    }
+
+    let results = join_all(handles).await;
+    results.into_iter().filter_map(|r| r.ok()).collect()
 }
