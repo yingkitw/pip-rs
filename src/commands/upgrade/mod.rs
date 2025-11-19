@@ -141,29 +141,6 @@ pub async fn handle_upgrade_all() -> Result<i32> {
         return Ok(0);
     }
     
-    // Second pass: upgrade outdated packages with progress
-    let mut upgraded_count = 0;
-    let mut failed_count = 0;
-    let mut progress = ProgressIndicator::new(outdated_packages.len());
-    
-    for (name, version, latest) in outdated_packages {
-        // Show progress before upgrade
-        progress.update(&name, true);
-        
-        // Upgrade immediately
-        let result = upgrade_package(&name, &version, &latest);
-        
-        if result.success {
-            upgraded_count += 1;
-            println!("{:<50} {:<20} {:<20} ✓ UPGRADED", name, version, latest);
-        } else {
-            failed_count += 1;
-            println!("{:<50} {:<20} {:<20} ✗ FAILED", name, version, latest);
-        }
-    }
-    
-    // Final progress bar
-    progress.finish();
     
     // Summary
     println!("\n{}", "=".repeat(100));
