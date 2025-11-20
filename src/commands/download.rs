@@ -1,4 +1,5 @@
 /// Download command - download packages without installing
+use crate::errors::PipError;
 use anyhow::{Result, anyhow};
 use std::path::Path;
 
@@ -6,10 +7,12 @@ pub async fn handle_download(
     packages: Vec<String>,
     requirements: Option<String>,
     destination: Option<String>,
-) -> Result<i32> {
+) -> Result<i32, PipError> {
     if packages.is_empty() && requirements.is_none() {
-        eprintln!("ERROR: You must give at least one requirement to download");
-        return Ok(1);
+        return Err(PipError::InvalidRequirement {
+            spec: "None".to_string(),
+            reason: "You must give at least one requirement to download".to_string(),
+        });
     }
 
     let mut all_requirements = Vec::new();
@@ -21,7 +24,11 @@ pub async fn handle_download(
 
     // Parse requirements file if provided
     if let Some(req_file) = requirements {
-        let contents = std::fs::read_to_string(&req_file)?;
+        let contents = std::fs::read_to_string(&req_file).map_err(|e| PipError::FileSystemError {
+            path: req_file.clone(),
+            operation: "read".to_string(),
+            reason: e.to_string(),
+        })?;
         for line in contents.lines() {
             let line = line.trim();
             if !line.is_empty() && !line.starts_with('#') {
@@ -41,20 +48,28 @@ pub async fn handle_download(
                 parsed_reqs.push(req);
             }
             Err(e) => {
-                eprintln!("Warning: Failed to parse requirement '{}': {}", req_str, e);
+                return Err(PipError::InvalidRequirement {
+                    spec: req_str,
+                    reason: e.to_string(),
+                });
             }
         }
     }
 
     if parsed_reqs.is_empty() {
-        eprintln!("ERROR: No valid requirements found");
-        return Ok(1);
+        return Err(PipError::InvalidRequirement {
+            spec: "None".to_string(),
+            reason: "No valid requirements found".to_string(),
+        });
     }
 
     // Resolve dependencies
     println!("\nResolving dependencies...");
     let mut resolver = crate::resolver::Resolver::new();
-    let resolved = resolver.resolve(parsed_reqs).await?;
+    let resolved = resolver.resolve(parsed_reqs).await.map_err(|e| PipError::InstallationFailed {
+        package: "dependencies".to_string(),
+        reason: e.to_string(),
+    })?;
 
     println!("Successfully resolved {} packages:", resolved.len());
     for pkg in &resolved {
@@ -66,7 +81,11 @@ pub async fn handle_download(
     let dest_path = Path::new(&dest_dir);
     
     if !dest_path.exists() {
-        std::fs::create_dir_all(dest_path)?;
+        std::fs::create_dir_all(dest_path).map_err(|e| PipError::FileSystemError {
+            path: dest_dir.clone(),
+            operation: "create_dir".to_string(),
+            reason: e.to_string(),
+        })?;
     }
 
     // Download packages

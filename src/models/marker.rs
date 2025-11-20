@@ -1,7 +1,3 @@
-/// PEP 508 Environment Markers
-/// Handles parsing and evaluation of environment markers for conditional dependencies
-
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Marker {

@@ -35,7 +35,9 @@ pub async fn handle_upgrade(package_name: &str, _target: Option<&str>) -> Result
     Ok(())
 }
 
-pub async fn handle_upgrade_all() -> Result<i32> {
+use crate::errors::PipError;
+
+pub async fn handle_upgrade_all() -> Result<i32, PipError> {
     use default_impl::*;
     use traits::UpgradeConfig;
     use handler::UpgradeHandler;
@@ -47,7 +49,28 @@ pub async fn handle_upgrade_all() -> Result<i32> {
     let config = UpgradeConfig::default();
 
     let upgrade_handler = UpgradeHandler::new(detector, fetcher, installer, reporter, config);
-    upgrade_handler.upgrade_all().await
+    upgrade_handler.upgrade_all().await.map_err(|e| PipError::InstallationFailed {
+        package: "all packages".to_string(),
+        reason: e.to_string(),
+    })
+}
+
+pub async fn handle_upgrade_packages(packages: Vec<String>) -> Result<i32, PipError> {
+    use default_impl::*;
+    use traits::UpgradeConfig;
+    use handler::UpgradeHandler;
+
+    let detector = DefaultPackageDetector;
+    let fetcher = DefaultMetadataFetcher;
+    let installer = DefaultPackageInstaller;
+    let reporter = DefaultProgressReporter::new(false);
+    let config = UpgradeConfig::default();
+
+    let upgrade_handler = UpgradeHandler::new(detector, fetcher, installer, reporter, config);
+    upgrade_handler.upgrade_packages(packages).await.map_err(|e| PipError::InstallationFailed {
+        package: "requested packages".to_string(),
+        reason: e.to_string(),
+    })
 }
 
 #[cfg(test)]

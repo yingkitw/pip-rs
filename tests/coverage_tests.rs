@@ -116,18 +116,30 @@ fn test_coverage_config_multiple_indexes() -> Result<(), Box<dyn std::error::Err
 #[test]
 fn test_coverage_cache_multiple_versions() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
-    let cache = pip_rs::cache::PackageCache::new(temp_dir.path().to_path_buf())?;
+    let cache = pip_rs::cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
 
     // Store multiple versions of same package
     let versions = vec!["1.0.0", "1.1.0", "2.0.0"];
     for version in &versions {
-        let data = format!("data for {}", version).into_bytes();
-        cache.store("requests", version, &data)?;
+        let package = pip_rs::models::Package {
+            name: "requests".to_string(),
+            version: version.to_string(),
+            summary: Some(format!("Summary for {}", version)),
+            home_page: None,
+            author: None,
+            license: None,
+            requires_python: None,
+            requires_dist: vec![],
+            classifiers: vec![],
+        };
+        cache.set(&package)?;
     }
 
     // Verify all cached
     for version in &versions {
-        assert!(cache.is_cached("requests", version));
+        let cached = cache.get("requests", version)?;
+        assert!(cached.is_some());
+        assert_eq!(cached.unwrap().version, *version);
     }
 
     Ok(())

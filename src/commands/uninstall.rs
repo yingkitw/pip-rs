@@ -1,11 +1,13 @@
 /// Uninstall command implementation
-use anyhow::Result;
+use crate::errors::PipError;
 use std::io::{self, BufRead};
 
-pub async fn handle_uninstall(packages: Vec<String>, yes: bool) -> Result<i32> {
+pub async fn handle_uninstall(packages: Vec<String>, yes: bool) -> Result<i32, PipError> {
     if packages.is_empty() {
-        eprintln!("ERROR: You must specify at least one package to uninstall");
-        return Ok(1);
+        return Err(PipError::InvalidRequirement {
+            spec: "None".to_string(),
+            reason: "You must specify at least one package to uninstall".to_string(),
+        });
     }
 
     println!("The following packages will be removed:");
@@ -18,7 +20,11 @@ pub async fn handle_uninstall(packages: Vec<String>, yes: bool) -> Result<i32> {
         println!("\nProceed (y/n)? ");
         let stdin = io::stdin();
         let mut line = String::new();
-        stdin.lock().read_line(&mut line)?;
+        stdin.lock().read_line(&mut line).map_err(|e| PipError::FileSystemError {
+            path: "stdin".to_string(),
+            operation: "read".to_string(),
+            reason: e.to_string(),
+        })?;
         
         let response = line.trim().to_lowercase();
         if response != "y" && response != "yes" {
@@ -28,7 +34,10 @@ pub async fn handle_uninstall(packages: Vec<String>, yes: bool) -> Result<i32> {
     }
 
     // Uninstall packages
-    let site_packages = crate::installer::SitePackages::default()?;
+    let site_packages = crate::installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
+        package: "site-packages".to_string(),
+        reason: e.to_string(),
+    })?;
     let installer = crate::installer::PackageInstaller::new(site_packages);
     
     let mut uninstalled_count = 0;

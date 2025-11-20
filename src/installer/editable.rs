@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::fs;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct EditableInstall {
     project_path: PathBuf,
     site_packages: PathBuf,

@@ -1,6 +1,5 @@
 /// Upgrade command handler with dependency injection
 use super::traits::*;
-use super::conflict::ConflictDetector;
 use anyhow::Result;
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -133,6 +132,128 @@ where
 
         if outdated_packages.is_empty() {
             println!("\n✓ All packages are up-to-date!\n");
+            return Ok(0);
+        }
+
+        // Display outdated packages found
+        println!("\n📋 Found {} outdated packages. Starting upgrade...\n", outdated_packages.len());
+        println!("{:<50} {:<20} {:<20} {}", "Package", "Current", "Latest", "Status");
+        println!("{}", "-".repeat(100));
+
+        // Upgrade all packages in parallel
+        let results = self.installer.upgrade_parallel(outdated_packages, self.config.concurrency).await;
+        
+        // Display results
+        let (upgraded_count, failed_count) = results.iter().fold((0, 0), |(up, fail), result| {
+            let status = if result.success { "✓ UPGRADED" } else { "✗ FAILED" };
+            println!("{:<50} {:<20} {:<20} {}", 
+                result.name, result.current_version, result.latest_version, status);
+            
+            if result.success {
+                (up + 1, fail)
+            } else {
+                (up, fail + 1)
+            }
+        });
+
+        self.reporter.report_summary(upgraded_count, failed_count);
+        Ok(upgraded_count as i32)
+    }
+
+    /// Execute upgrade for specific packages
+    pub async fn upgrade_packages(&self, packages_to_upgrade: Vec<String>) -> Result<i32> {
+        println!("╔════════════════════════════════════════════════════════════════╗");
+        println!("║           pip-rs Package Update Tool                           ║");
+        println!("╚════════════════════════════════════════════════════════════════╝\n");
+
+        // Get installed packages
+        let installed_packages = self.detector.get_installed().await?;
+
+        if installed_packages.is_empty() {
+            println!("✗ No packages found in site-packages");
+            return Ok(0);
+        }
+
+        // Filter to only packages requested
+        let packages: Vec<_> = installed_packages
+            .into_iter()
+            .filter(|p| packages_to_upgrade.contains(&p.name))
+            .collect();
+
+        if packages.is_empty() {
+            println!("✗ None of the requested packages are installed. Nothing to do.");
+            return Ok(0);
+        }
+        
+        println!("📦 Scanning {} requested packages for updates...\n", packages.len());
+
+        // Create channel for real-time result streaming
+        let (tx, mut rx) = mpsc::channel(100);
+        let total_packages = packages.len();
+
+        // Spawn task to fetch packages
+        let packages_clone = packages.clone();
+        let fetcher = self.fetcher.clone();
+        let detector = self.detector.clone();
+
+        tokio::spawn(async move {
+            let semaphore = Arc::new(Semaphore::new(5));
+            let mut handles = vec![];
+
+            // Spawn all tasks at once for real-time streaming
+            for pkg in packages_clone.iter() {
+                let semaphore_clone = semaphore.clone();
+                let tx_clone = tx.clone();
+                let name = pkg.name.clone();
+                let version = pkg.version.clone();
+                let fetcher_clone = fetcher.clone();
+                let detector_clone = detector.clone();
+
+                let handle = tokio::spawn(async move {
+                    let _permit = semaphore_clone.acquire().await.ok();
+                    match fetcher_clone.fetch_latest(&name).await {
+                        Ok(latest) => {
+                            let is_outdated =
+                                detector_clone.compare_versions(&version, &latest) == Ordering::Less;
+                            let _ = tx_clone.send((name, version, latest, is_outdated)).await;
+                        }
+                        Err(_) => {
+                            // Silently skip failed requests
+                        }
+                    }
+                });
+                handles.push(handle);
+            }
+
+            // Wait for all tasks to complete
+            let _ = join_all(handles).await;
+        });
+
+        // Collect all outdated packages first
+        let mut checked_count = 0;
+        let mut outdated_packages = Vec::new();
+        
+        while let Some((name, version, latest, is_outdated)) = rx.recv().await {
+            checked_count += 1;
+            
+            if is_outdated {
+                outdated_packages.push((name, version, latest));
+            } else {
+                self.reporter
+                    .report_scanning(checked_count, total_packages, &name, false);
+            }
+
+            // Break if all packages checked
+            if checked_count >= total_packages {
+                break;
+            }
+        }
+
+        eprintln!("\r{}", " ".repeat(100));
+        eprintln!("\r[100%] [{}] {}/{} | Scan complete!", "█".repeat(20), total_packages, total_packages);
+
+        if outdated_packages.is_empty() {
+            println!("\n✓ All requested packages are up-to-date!\n");
             return Ok(0);
         }
 

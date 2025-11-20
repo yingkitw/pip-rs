@@ -1,12 +1,18 @@
 /// Freeze command - generate requirements.txt from installed packages
+use crate::errors::PipError;
 use anyhow::Result;
-use std::path::Path;
 use std::fs;
 
-pub async fn handle_freeze(output: Option<String>) -> Result<i32> {
+pub async fn handle_freeze(output: Option<String>) -> Result<i32, PipError> {
     // Get installed packages
-    let site_packages = crate::installer::SitePackages::default()?;
-    let packages = site_packages.get_installed_packages()?;
+    let site_packages = crate::installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
+        package: "site-packages".to_string(),
+        reason: e.to_string(),
+    })?;
+    let packages = site_packages.get_installed_packages().map_err(|e| PipError::InstallationFailed {
+        package: "site-packages".to_string(),
+        reason: e.to_string(),
+    })?;
 
     if packages.is_empty() {
         println!("No packages installed");
@@ -34,7 +40,11 @@ pub async fn handle_freeze(output: Option<String>) -> Result<i32> {
     let output_text = requirements.join("\n");
     
     if let Some(output_file) = output {
-        fs::write(&output_file, &output_text)?;
+        fs::write(&output_file, &output_text).map_err(|e| PipError::FileSystemError {
+            path: output_file.clone(),
+            operation: "write".to_string(),
+            reason: e.to_string(),
+        })?;
         println!("Wrote requirements to {}", output_file);
     } else {
         println!("{}", output_text);

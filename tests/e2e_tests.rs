@@ -136,15 +136,25 @@ fn test_e2e_config_and_cache() -> Result<(), Box<dyn std::error::Error>> {
     // Test caching
     let cache_dir = temp_dir.path().join("cache");
     fs::create_dir_all(&cache_dir)?;
-    let cache = pip_rs::cache::PackageCache::new(cache_dir)?;
+    let cache = pip_rs::cache::PackageCache::new_custom(cache_dir)?;
 
     // Store and retrieve
-    let data = b"test package data";
-    cache.store("requests", "2.28.0", data)?;
-    assert!(cache.is_cached("requests", "2.28.0"));
-
-    let retrieved = cache.retrieve("requests", "2.28.0")?;
-    assert_eq!(retrieved, data);
+    let package = pip_rs::models::Package {
+        name: "requests".to_string(),
+        version: "2.28.0".to_string(),
+        summary: Some("test package data".to_string()),
+        home_page: None,
+        author: None,
+        license: None,
+        requires_python: None,
+        requires_dist: vec![],
+        classifiers: vec![],
+    };
+    
+    cache.set(&package)?;
+    let retrieved = cache.get("requests", "2.28.0")?;
+    assert!(retrieved.is_some());
+    assert_eq!(retrieved.unwrap().summary, package.summary);
 
     Ok(())
 }
@@ -318,28 +328,35 @@ fn test_e2e_site_packages_operations() -> Result<(), Box<dyn std::error::Error>>
 #[test]
 fn test_e2e_cache_operations() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
-    let cache = pip_rs::cache::PackageCache::new(temp_dir.path().to_path_buf())?;
+    let cache = pip_rs::cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
 
     // Store multiple packages
     let packages = vec![
-        ("requests", "2.28.0", b"requests data here".as_ref()),
-        ("numpy", "1.20.0", b"numpy data here".as_ref()),
-        ("django", "3.2.0", b"django data here".as_ref()),
+        ("requests", "2.28.0", "requests data here"),
+        ("numpy", "1.20.0", "numpy data here"),
+        ("django", "3.2.0", "django data here"),
     ];
 
-    for (name, version, data) in &packages {
-        cache.store(name, version, data)?;
+    for (name, version, summary) in &packages {
+        let package = pip_rs::models::Package {
+            name: name.to_string(),
+            version: version.to_string(),
+            summary: Some(summary.to_string()),
+            home_page: None,
+            author: None,
+            license: None,
+            requires_python: None,
+            requires_dist: vec![],
+            classifiers: vec![],
+        };
+        cache.set(&package)?;
     }
 
-    // Verify all cached
-    for (name, version, _) in &packages {
-        assert!(cache.is_cached(name, version));
-    }
-
-    // Retrieve all
-    for (name, version, expected_data) in &packages {
-        let retrieved = cache.retrieve(name, version)?;
-        assert_eq!(retrieved, *expected_data);
+    // Verify all cached and retrieve
+    for (name, version, expected_summary) in &packages {
+        let retrieved = cache.get(name, version)?;
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().summary, Some(expected_summary.to_string()));
     }
 
     Ok(())

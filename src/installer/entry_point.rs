@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::fs;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct EntryPoint {
     pub name: String,
     pub module: String,

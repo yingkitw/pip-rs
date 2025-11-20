@@ -4,7 +4,7 @@ use anyhow::Result;
 use std::cmp::Ordering;
 
 use super::detector::InstalledPackage;
-use super::conflict::{VersionConflict, ConflictDetector};
+use super::conflict::VersionConflict;
 
 /// Trait for package detection
 #[async_trait]

@@ -1,7 +1,7 @@
 /// Shell completion generation for bash, zsh, fish, and powershell
-use anyhow::Result;
+use crate::errors::PipError;
 
-pub async fn handle_completion(shell: String) -> Result<i32> {
+pub async fn handle_completion(shell: String) -> Result<i32, PipError> {
     match shell.to_lowercase().as_str() {
         "bash" => {
             print_bash_completion();

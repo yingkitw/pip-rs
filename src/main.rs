@@ -139,9 +139,8 @@ async fn main() {
                 // Update all outdated packages
                 commands::upgrade::handle_upgrade_all().await
             } else {
-                // Update specific packages (not implemented yet)
-                eprintln!("Updating specific packages not yet implemented");
-                Ok(1)
+                // Update specific packages
+                commands::upgrade::handle_upgrade_packages(packages).await
             }
         }
         Commands::Freeze { output } => commands::freeze::handle_freeze(output).await,
@@ -158,10 +157,14 @@ async fn main() {
         Commands::Completion { shell } => commands::completion::handle_completion(shell).await,
     };
 
+use errors::format_error_with_suggestion;
+
+// ... (rest of the file)
+
     match result {
         Ok(code) => process::exit(code),
         Err(e) => {
-            eprintln!("Error: {}", e);
+            eprintln!("{}", format_error_with_suggestion(&e.to_string()));
             eprintln!("Run with RUST_LOG=debug for more details");
             process::exit(1);
         }

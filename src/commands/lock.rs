@@ -1,11 +1,12 @@
 /// Lock command - generate lock files for reproducible installs
+use crate::errors::PipError;
 use anyhow::Result;
 use std::path::Path;
 
 pub async fn handle_lock(
     requirements: Option<String>,
     output: Option<String>,
-) -> Result<i32> {
+) -> Result<i32, PipError> {
     if requirements.is_none() {
         eprintln!("ERROR: You must provide a requirements file with -r/--requirements");
         return Ok(1);
@@ -20,7 +21,11 @@ pub async fn handle_lock(
     println!("Reading requirements from {}...", req_file);
 
     // Parse requirements file
-    let contents = std::fs::read_to_string(&req_file)?;
+    let contents = std::fs::read_to_string(&req_file).map_err(|e| PipError::FileSystemError {
+        path: req_file.clone(),
+        operation: "read".to_string(),
+        reason: e.to_string(),
+    })?;
     let mut all_requirements = Vec::new();
 
     for line in contents.lines() {
@@ -59,7 +64,10 @@ pub async fn handle_lock(
     // Resolve dependencies
     println!("\nResolving dependencies...");
     let mut resolver = crate::resolver::Resolver::new();
-    let resolved = resolver.resolve(parsed_reqs).await?;
+    let resolved = resolver.resolve(parsed_reqs).await.map_err(|e| PipError::DependencyResolutionError {
+        package: "requirements".to_string(),
+        reason: e.to_string(),
+    })?;
 
     println!("Successfully resolved {} packages:", resolved.len());
     for pkg in &resolved {
@@ -72,11 +80,18 @@ pub async fn handle_lock(
     let lockfile = crate::resolver::LockFile::from_packages(resolved, python_version);
 
     // Validate lock file
-    lockfile.validate()?;
+    lockfile.validate().map_err(|e| PipError::InvalidPackage {
+        name: "lockfile".to_string(),
+        reason: e.to_string(),
+    })?;
 
     // Save lock file
     let lock_path = output.unwrap_or_else(|| "pip-lock.json".to_string());
-    lockfile.save(Path::new(&lock_path))?;
+    lockfile.save(Path::new(&lock_path)).map_err(|e| PipError::FileSystemError {
+        path: lock_path.clone(),
+        operation: "save".to_string(),
+        reason: e.to_string(),
+    })?;
 
     println!("\n✓ Lock file generated: {}", lock_path);
     println!("  Packages: {}", lockfile.packages.len());
@@ -88,7 +103,7 @@ pub async fn handle_lock(
 
 pub async fn handle_lock_install(
     lock_file: String,
-) -> Result<i32> {
+) -> Result<i32, PipError> {
     if !Path::new(&lock_file).exists() {
         eprintln!("ERROR: Lock file not found: {}", lock_file);
         return Ok(1);
@@ -97,10 +112,17 @@ pub async fn handle_lock_install(
     println!("Reading lock file: {}", lock_file);
 
     // Load lock file
-    let lockfile = crate::resolver::LockFile::load(Path::new(&lock_file))?;
+    let lockfile = crate::resolver::LockFile::load(Path::new(&lock_file)).map_err(|e| PipError::FileSystemError {
+        path: lock_file.clone(),
+        operation: "load".to_string(),
+        reason: e.to_string(),
+    })?;
 
     // Validate lock file
-    lockfile.validate()?;
+    lockfile.validate().map_err(|e| PipError::InvalidPackage {
+        name: "lockfile".to_string(),
+        reason: e.to_string(),
+    })?;
 
     println!("Lock file validated");
     println!("  Packages: {}", lockfile.packages.len());
@@ -113,7 +135,11 @@ pub async fn handle_lock_install(
     // Install packages
     println!("\nInstalling {} packages from lock file...", packages.len());
     
-    let temp_dir = tempfile::TempDir::new()?;
+    let temp_dir = tempfile::TempDir::new().map_err(|e| PipError::FileSystemError {
+        path: "temp".to_string(),
+        operation: "create".to_string(),
+        reason: e.to_string(),
+    })?;
     let mut installed_count = 0;
     let mut failed_count = 0;
 
@@ -141,24 +167,47 @@ pub async fn handle_lock_install(
 }
 
 /// Install a single package by downloading and extracting its wheel
-async fn install_package(pkg: &crate::models::Package, temp_dir: &std::path::Path) -> Result<()> {
+async fn install_package(pkg: &crate::models::Package, temp_dir: &std::path::Path) -> Result<(), PipError> {
     // Find wheel URL
-    let wheel_url = crate::network::find_wheel_url(&pkg.name, &pkg.version).await?;
+    let wheel_url = crate::network::find_wheel_url(&pkg.name, &pkg.version).await.map_err(|e| PipError::PackageNotFound {
+        name: pkg.name.clone(),
+        version: Some(pkg.version.clone()),
+    })?;
     
     // Download wheel
     eprintln!("  Downloading {} from {}", pkg.name, wheel_url);
-    let wheel_data = crate::network::PackageClient::new().download_package(&wheel_url).await?;
+    let wheel_data = crate::network::PackageClient::new()
+        .download_package(&wheel_url)
+        .await
+        .map_err(|e| PipError::NetworkError {
+            message: format!("Failed to download {}", pkg.name),
+            retries: 0,
+            last_error: e.to_string(),
+        })?;
     
     // Save wheel to temp directory
     let wheel_filename = format!("{}-{}.whl", pkg.name, pkg.version);
     let wheel_path = temp_dir.join(&wheel_filename);
-    std::fs::write(&wheel_path, wheel_data)?;
+    std::fs::write(&wheel_path, wheel_data).map_err(|e| PipError::FileSystemError {
+        path: wheel_path.to_string_lossy().to_string(),
+        operation: "write".to_string(),
+        reason: e.to_string(),
+    })?;
     
     // Extract and install wheel
-    let wheel = crate::installer::wheel::WheelFile::new(wheel_path)?;
-    let site_packages = crate::installer::SitePackages::default()?;
+    let wheel = crate::installer::wheel::WheelFile::new(wheel_path).map_err(|e| PipError::InvalidPackage {
+        name: pkg.name.clone(),
+        reason: e.to_string(),
+    })?;
+    let site_packages = crate::installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
+        package: pkg.name.clone(),
+        reason: e.to_string(),
+    })?;
     let installer = crate::installer::PackageInstaller::new(site_packages);
-    installer.install_wheel(&wheel).await?;
+    installer.install_wheel(&wheel).await.map_err(|e| PipError::InstallationFailed {
+        package: pkg.name.clone(),
+        reason: e.to_string(),
+    })?;
     
     Ok(())
 }

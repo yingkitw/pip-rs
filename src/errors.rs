@@ -45,6 +45,16 @@ pub enum PipError {
     ConfigError {
         message: String,
     },
+    /// Dependency resolution error
+    DependencyResolutionError {
+        package: String,
+        reason: String,
+    },
+    /// Invalid package error
+    InvalidPackage {
+        name: String,
+        reason: String,
+    },
 }
 
 impl fmt::Display for PipError {
@@ -101,6 +111,12 @@ impl fmt::Display for PipError {
             }
             PipError::ConfigError { message } => {
                 write!(f, "Configuration error: {}", message)
+            }
+            PipError::DependencyResolutionError { package, reason } => {
+                write!(f, "Failed to resolve dependencies for {}: {}", package, reason)
+            }
+            PipError::InvalidPackage { name, reason } => {
+                write!(f, "Invalid package {}: {}", name, reason)
             }
         }
     }

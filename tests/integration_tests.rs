@@ -167,18 +167,28 @@ fn test_site_packages_workflow() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_cache_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
-    let cache = pip_rs::cache::PackageCache::new(temp_dir.path().to_path_buf())?;
+    let cache = pip_rs::cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
+
+    // Create test package
+    let package = pip_rs::models::Package {
+        name: "requests".to_string(),
+        version: "2.28.0".to_string(),
+        summary: Some("Python HTTP for Humans.".to_string()),
+        home_page: None,
+        author: None,
+        license: None,
+        requires_python: None,
+        requires_dist: vec![],
+        classifiers: vec![],
+    };
 
     // Store data
-    let data = b"test package data";
-    cache.store("requests", "2.28.0", data)?;
+    cache.set(&package)?;
 
     // Verify cached
-    assert!(cache.is_cached("requests", "2.28.0"));
-
-    // Retrieve data
-    let retrieved = cache.retrieve("requests", "2.28.0")?;
-    assert_eq!(retrieved, data);
+    let cached = cache.get("requests", "2.28.0")?;
+    assert!(cached.is_some());
+    assert_eq!(cached.unwrap().summary, package.summary);
 
     Ok(())
 }

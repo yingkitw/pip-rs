@@ -1,7 +1,7 @@
 /// Show command implementation
-use anyhow::Result;
+use crate::errors::PipError;
 
-pub async fn handle_show(package: &str) -> Result<i32> {
+pub async fn handle_show(package: &str) -> Result<i32, PipError> {
     println!("Fetching information for package: {}", package);
     
     match crate::network::get_package_metadata(package, "latest").await {
@@ -29,8 +29,10 @@ pub async fn handle_show(package: &str) -> Result<i32> {
             Ok(0)
         }
         Err(e) => {
-            eprintln!("ERROR: Package '{}' not found: {}", package, e);
-            Ok(1)
+            Err(PipError::PackageNotFound {
+                name: package.to_string(),
+                version: None,
+            })
         }
     }
 }

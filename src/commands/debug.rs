@@ -1,7 +1,7 @@
 /// Debug command - display system and environment information
-use anyhow::Result;
+use crate::errors::PipError;
 
-pub async fn handle_debug() -> Result<i32> {
+pub async fn handle_debug() -> Result<i32, PipError> {
     println!("pip-rs debug information\n");
 
     // System information
@@ -109,7 +109,7 @@ fn print_pip_config() {
     }
 }
 
-async fn print_installed_packages() -> Result<()> {
+async fn print_installed_packages() -> Result<(), PipError> {
     match crate::installer::SitePackages::default() {
         Ok(site_packages) => {
             match site_packages.get_installed_packages() {

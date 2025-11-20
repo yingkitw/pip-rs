@@ -1,7 +1,7 @@
 /// Search command implementation
-use anyhow::Result;
+use crate::errors::PipError;
 
-pub async fn handle_search(query: &str) -> Result<i32> {
+pub async fn handle_search(query: &str) -> Result<i32, PipError> {
     println!("Searching for packages matching '{}'...", query);
     
     match crate::network::search_package(query).await {
@@ -17,8 +17,11 @@ pub async fn handle_search(query: &str) -> Result<i32> {
             Ok(0)
         }
         Err(e) => {
-            eprintln!("ERROR: Search failed: {}", e);
-            Ok(1)
+            Err(PipError::NetworkError {
+                message: "Search failed".to_string(),
+                retries: 0,
+                last_error: e.to_string(),
+            })
         }
     }
 }

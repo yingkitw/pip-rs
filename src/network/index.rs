@@ -1,7 +1,6 @@
 /// PyPI index management and support for multiple indexes
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// PyPI index configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
