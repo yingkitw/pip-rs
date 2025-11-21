@@ -6,7 +6,7 @@ fn test_venv_creation_and_activation() -> Result<(), Box<dyn std::error::Error>>
     let venv_path = temp_dir.path().join("test_venv");
 
     // Create virtual environment
-    let venv = pip_rs::venv::VirtualEnvironment::new(venv_path.clone(), "3.11".to_string());
+    let venv = pip_rs::venv::environment::VirtualEnvironment::new(venv_path.clone(), "3.11".to_string());
     venv.create()?;
 
     // Verify structure
@@ -15,7 +15,7 @@ fn test_venv_creation_and_activation() -> Result<(), Box<dyn std::error::Error>>
     assert!(venv.get_bin_path().exists());
 
     // Generate activation script
-    let activation = pip_rs::venv::ActivationScript::new(venv_path);
+    let activation = pip_rs::venv::activation::ActivationScript::new(venv_path);
     let bash_script = activation.generate_bash();
     assert!(bash_script.contains("VIRTUAL_ENV="));
     assert!(bash_script.contains("deactivate"));
@@ -29,13 +29,13 @@ fn test_config_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let config_path = temp_dir.path().join("pip.conf");
 
     // Create and save config
-    let mut config = pip_rs::config::Config::new();
+    let mut config = pip_rs::config::config::Config::new();
     config.set_timeout(30);
     config.add_extra_index_url("https://test.pypi.org/simple/".to_string());
     config.save_to_file(&config_path)?;
 
     // Load and verify
-    let loaded = pip_rs::config::Config::load_from_file(&config_path)?;
+    let loaded = pip_rs::config::config::Config::load_from_file(&config_path)?;
     assert_eq!(loaded.timeout(), 30);
     assert_eq!(loaded.extra_index_urls().len(), 1);
 
@@ -58,7 +58,7 @@ fn test_editable_install_workflow() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Install in editable mode
-    let editable = pip_rs::installer::EditableInstall::new(project_dir.clone(), site_packages.clone());
+    let editable = pip_rs::installer::editable::EditableInstall::new(project_dir.clone(), site_packages.clone());
     editable.install()?;
 
     // Verify .pth file exists
@@ -94,9 +94,9 @@ fn test_requirement_parsing_workflow() -> Result<(), Box<dyn std::error::Error>>
 
 #[test]
 fn test_version_comparison_workflow() -> Result<(), Box<dyn std::error::Error>> {
-    let v1 = pip_rs::utils::Version::parse("2.28.0")?;
-    let v2 = pip_rs::utils::Version::parse("2.29.0")?;
-    let v3 = pip_rs::utils::Version::parse("2.28.0")?;
+    let v1 = pip_rs::utils::version::Version::parse("2.28.0")?;
+    let v2 = pip_rs::utils::version::Version::parse("2.29.0")?;
+    let v3 = pip_rs::utils::version::Version::parse("2.28.0")?;
 
     assert!(v2 > v1);
     assert!(v1 == v3);
@@ -136,7 +136,7 @@ dependencies = [
 "#;
 
     std::fs::write(&pyproject_path, content)?;
-    let pyproject = pip_rs::config::PyProject::load(&pyproject_path)?;
+    let pyproject = pip_rs::config::pyproject::PyProject::load(&pyproject_path)?;
 
     assert_eq!(pyproject.get_name(), Some("test-package".to_string()));
     assert_eq!(pyproject.get_version(), Some("0.1.0".to_string()));
@@ -167,7 +167,7 @@ fn test_site_packages_workflow() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_cache_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
-    let cache = pip_rs::cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
+    let cache = pip_rs::cache::package_cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
 
     // Create test package
     let package = pip_rs::models::Package {
@@ -195,7 +195,7 @@ fn test_cache_workflow() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_entry_point_generation_workflow() -> Result<(), Box<dyn std::error::Error>> {
-    let ep = pip_rs::installer::EntryPoint::new(
+    let ep = pip_rs::installer::entry_point::EntryPoint::new(
         "pip".to_string(),
         "pip._internal.cli.main".to_string(),
         "main".to_string(),

@@ -3,11 +3,13 @@ use anyhow::Result;
 use std::path::Path;
 use std::fs;
 use std::cmp::Ordering;
+use std::io::Write;
 
 #[derive(Debug, Clone)]
 struct Package {
     name: String,
     version: String,
+    latest_version: Option<String>,
 }
 
 fn compare_versions(current: &str, latest: &str) -> Ordering {
@@ -82,7 +84,11 @@ pub async fn handle_list(outdated: bool) -> Result<i32, PipError> {
                             if let Some(last_dash) = pkg_info.rfind('-') {
                                 let pkg_name = pkg_info[..last_dash].to_string();
                                 let version = pkg_info[last_dash + 1..].to_string();
-                                packages.push(Package { name: pkg_name, version });
+                                packages.push(Package { 
+                                    name: pkg_name, 
+                                    version,
+                                    latest_version: None,
+                                });
                             }
                         }
                     }
@@ -94,9 +100,89 @@ pub async fn handle_list(outdated: bool) -> Result<i32, PipError> {
 
     if packages.is_empty() {
         println!("No packages found in site-packages");
-    } else {
-        // ... (rest of the function)
+        return Ok(0);
     }
 
+    // Sort packages by name
+    packages.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    // If outdated flag is set, fetch latest versions
+    if outdated {
+        use crate::network::get_package_metadata;
+        use std::sync::Arc;
+        use tokio::sync::Semaphore;
+        use futures::future::join_all;
+
+        println!("\n📦 Checking for updates ({} packages)...\n", packages.len());
+
+        // Fetch latest versions in parallel (10 concurrent)
+        let semaphore = Arc::new(Semaphore::new(10));
+        let mut handles = vec![];
+        let total = packages.len();
+
+        for (idx, pkg) in packages.iter_mut().enumerate() {
+            let semaphore_clone = semaphore.clone();
+            let pkg_name = pkg.name.clone();
+            
+            let handle = tokio::spawn(async move {
+                let _permit = semaphore_clone.acquire().await.ok();
+                match get_package_metadata(&pkg_name, "latest").await {
+                    Ok(metadata) => Some((pkg_name, metadata.version, idx)),
+                    Err(_) => None,
+                }
+            });
+            handles.push(handle);
+        }
+
+        // Collect results with progress feedback
+        let results = join_all(handles).await;
+        let mut checked = 0;
+        for result in results.into_iter() {
+            checked += 1;
+            if checked % 50 == 0 || checked == total {
+                eprint!("\r  Checked {}/{} packages...", checked, total);
+                let _ = std::io::Write::flush(&mut std::io::stderr());
+            }
+            
+            if let Ok(Some((_, latest, idx))) = result {
+                packages[idx].latest_version = Some(latest);
+            }
+        }
+        eprintln!("\r  Checked {}/{} packages...✓", total, total);
+
+        // Filter to only outdated packages
+        packages.retain(|pkg| {
+            if let Some(latest) = &pkg.latest_version {
+                compare_versions(&pkg.version, latest) == Ordering::Less
+            } else {
+                false
+            }
+        });
+
+        if packages.is_empty() {
+            println!("✓ All packages are up-to-date!\n");
+            return Ok(0);
+        }
+
+        // Display outdated packages
+        println!("{:<45} {:<15} {:<15}", "Package", "Current", "Latest");
+        println!("{}", "-".repeat(75));
+        
+        for pkg in packages {
+            if let Some(latest) = pkg.latest_version {
+                println!("{:<45} {:<15} {:<15}", pkg.name, pkg.version, latest);
+            }
+        }
+    } else {
+        // Display all packages
+        println!("\n{:<50} {:<20}", "Package", "Version");
+        println!("{}", "-".repeat(70));
+        
+        for pkg in packages {
+            println!("{:<50} {:<20}", pkg.name, pkg.version);
+        }
+    }
+    
+    println!();
     Ok(0)
 }

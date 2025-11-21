@@ -65,57 +65,66 @@ impl DefaultProgressReporter {
 impl ProgressReporter for DefaultProgressReporter {
     fn report_scanning(&self, current: usize, total: usize, package: &str, is_outdated: bool) {
         let percent = (current as f64 / total as f64 * 100.0) as u32;
-        let bar_width: usize = 20;
+        let bar_width: usize = 25;
         let filled = (bar_width as f64 * percent as f64 / 100.0) as usize;
         let empty = bar_width.saturating_sub(filled);
         let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
-        let action = if is_outdated { "Found" } else { "Scanning" };
         
-        eprint!("\r[{:3}%] [{}] {}/{} | {}: {}                    ", 
-            percent, bar, current, total, action, package);
+        // Truncate package name to fit terminal width
+        let pkg_display = if package.len() > 30 {
+            format!("{}...", &package[..27])
+        } else {
+            package.to_string()
+        };
+        
+        let status_icon = if is_outdated { "🔄" } else { "✓" };
+        
+        eprint!("\r  {status_icon} [{:3}%] [{bar}] {current:>4}/{total:<4} | {pkg_display:<33}", 
+            percent, status_icon = status_icon, bar = bar, current = current, total = total, pkg_display = pkg_display);
         let _ = std::io::Write::flush(&mut std::io::stderr());
     }
     
     fn report_scan_complete(&self, total: usize, outdated_count: usize) {
-        eprintln!("\r[100%] [{}] {}/{} | Scan complete!                                                     ", 
-            "█".repeat(20), total, total);
+        eprintln!("\r  ✓ [100%] [{}] {}/{} | Scan complete!                                    ", 
+            "█".repeat(25), total, total);
         
         if outdated_count > 0 {
-            println!("\n{:<50} {:<20} {:<20}", "Package", "Current", "Latest");
-            println!("{}", "-".repeat(90));
-            println!("\n✓ Found {} outdated packages to upgrade", outdated_count);
-            println!("  Starting parallel upgrade (5 concurrent)...\n");
+            println!("\n  📦 Found {outdated_count} outdated package{} to upgrade", 
+                if outdated_count == 1 { "" } else { "s" });
+            println!("  ⚡ Starting parallel upgrade (10 concurrent)...\n");
+            println!("  {:<45} {:<15} {:<15} {:<12}", "Package", "Current", "Latest", "Status");
+            println!("  {}", "-".repeat(90));
         }
     }
     
     fn report_result(&self, _result: &UpgradeResult) {
-        eprint!("\r{}", " ".repeat(100));
+        // Results are printed directly in handler, no need to print here
     }
     
     fn report_conflict(&self, conflict: &VersionConflict) {
-        println!("⚠️  CONFLICT: {} {} → {} conflicts with {} {}", 
+        println!("  ⚠️  CONFLICT: {} {} → {} conflicts with {} {}", 
             conflict.package, conflict.current_version, conflict.new_version,
             conflict.conflicting_package, conflict.conflicting_version);
-        println!("   Reason: {}", conflict.reason);
+        println!("      Reason: {}", conflict.reason);
     }
     
     fn report_unmet_dependencies(&self, package: &str, dependencies: &[String]) {
         if !dependencies.is_empty() {
-            println!("⚠️  UNMET DEPENDENCIES for {}:", package);
+            println!("  ⚠️  UNMET DEPENDENCIES for {}:", package);
             for dep in dependencies {
-                println!("   - {}", dep);
+                println!("      - {}", dep);
             }
         }
     }
     
     fn report_summary(&self, upgraded: usize, failed: usize) {
-        let separator = "=".repeat(90);
+        let separator = "  ".to_string() + &"─".repeat(88);
         println!("\n{}", separator);
         if failed == 0 {
-            println!("✓ Upgrade complete! {} packages updated successfully", upgraded);
+            println!("  ✅ Success! {} package{} updated", upgraded, if upgraded == 1 { "" } else { "s" });
         } else {
-            println!("⚠ Upgrade complete! {} packages updated, {} failed", upgraded, failed);
+            println!("  ⚠️  Completed with issues: {} updated, {} failed", upgraded, failed);
         }
-        println!("{}", separator);
+        println!("{}\n", separator);
     }
 }

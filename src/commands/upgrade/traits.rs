@@ -81,7 +81,7 @@ pub struct UpgradeConfig {
 impl Default for UpgradeConfig {
     fn default() -> Self {
         Self {
-            concurrency: 5,
+            concurrency: 10,
             verbose: false,
         }
     }

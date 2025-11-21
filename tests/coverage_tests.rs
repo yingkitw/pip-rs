@@ -51,7 +51,7 @@ fn test_coverage_version_edge_cases() -> Result<(), Box<dyn std::error::Error>> 
     ];
 
     for version_str in versions {
-        let version = pip_rs::utils::Version::parse(version_str)?;
+        let version = pip_rs::utils::version::Version::parse(version_str)?;
         let _ = version;
     }
 
@@ -63,7 +63,7 @@ fn test_coverage_venv_invalid_path() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
     let venv_path = temp_dir.path().join("test_venv");
 
-    let venv = pip_rs::venv::VirtualEnvironment::new(venv_path.clone(), "3.11".to_string());
+    let venv = pip_rs::venv::environment::VirtualEnvironment::new(venv_path.clone(), "3.11".to_string());
     venv.create()?;
 
     // Verify it's valid after creation
@@ -100,14 +100,14 @@ fn test_coverage_config_multiple_indexes() -> Result<(), Box<dyn std::error::Err
     let temp_dir = TempDir::new()?;
     let config_path = temp_dir.path().join("pip.conf");
 
-    let mut config = pip_rs::config::Config::new();
+    let mut config = pip_rs::config::config::Config::new();
     config.set_timeout(30);
     config.add_extra_index_url("https://test1.pypi.org/simple/".to_string());
     config.add_extra_index_url("https://test2.pypi.org/simple/".to_string());
     config.add_extra_index_url("https://test3.pypi.org/simple/".to_string());
     config.save_to_file(&config_path)?;
 
-    let loaded = pip_rs::config::Config::load_from_file(&config_path)?;
+    let loaded = pip_rs::config::config::Config::load_from_file(&config_path)?;
     assert_eq!(loaded.extra_index_urls().len(), 3);
 
     Ok(())
@@ -116,7 +116,7 @@ fn test_coverage_config_multiple_indexes() -> Result<(), Box<dyn std::error::Err
 #[test]
 fn test_coverage_cache_multiple_versions() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
-    let cache = pip_rs::cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
+    let cache = pip_rs::cache::package_cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
 
     // Store multiple versions of same package
     let versions = vec!["1.0.0", "1.1.0", "2.0.0"];
@@ -177,7 +177,7 @@ fn test_coverage_entry_points_multiple() -> Result<(), Box<dyn std::error::Error
     ];
 
     for (name, module, func) in entry_points {
-        let ep = pip_rs::installer::EntryPoint::new(
+        let ep = pip_rs::installer::entry_point::EntryPoint::new(
             name.to_string(),
             module.to_string(),
             func.to_string(),
@@ -193,18 +193,18 @@ fn test_coverage_entry_points_multiple() -> Result<(), Box<dyn std::error::Error
 #[test]
 fn test_coverage_validation_edge_cases() -> Result<(), Box<dyn std::error::Error>> {
     // Test package names with various valid formats
-    assert!(pip_rs::utils::validate_package_name("a").is_ok());
-    assert!(pip_rs::utils::validate_package_name("A").is_ok());
-    assert!(pip_rs::utils::validate_package_name("a1").is_ok());
-    assert!(pip_rs::utils::validate_package_name("a-b").is_ok());
-    assert!(pip_rs::utils::validate_package_name("a_b").is_ok());
-    assert!(pip_rs::utils::validate_package_name("a.b").is_ok());
-    assert!(pip_rs::utils::validate_package_name("a-b-c").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("a").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("A").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("a1").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("a-b").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("a_b").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("a.b").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("a-b-c").is_ok());
 
     // Test invalid package names
-    assert!(pip_rs::utils::validate_package_name("a b").is_err());
-    assert!(pip_rs::utils::validate_package_name("a@b").is_err());
-    assert!(pip_rs::utils::validate_package_name("a#b").is_err());
+    assert!(pip_rs::utils::validation::validate_package_name("a b").is_err());
+    assert!(pip_rs::utils::validation::validate_package_name("a@b").is_err());
+    assert!(pip_rs::utils::validation::validate_package_name("a#b").is_err());
 
     Ok(())
 }
@@ -212,21 +212,21 @@ fn test_coverage_validation_edge_cases() -> Result<(), Box<dyn std::error::Error
 #[test]
 fn test_coverage_security_edge_cases() -> Result<(), Box<dyn std::error::Error>> {
     // Test URL validation edge cases
-    assert!(pip_rs::utils::verify_url_safety("https://pypi.org/simple/").is_ok());
-    assert!(pip_rs::utils::verify_url_safety("http://example.com").is_ok());
-    assert!(pip_rs::utils::verify_url_safety("ftp://example.com").is_err());
-    assert!(pip_rs::utils::verify_url_safety("javascript:alert('xss')").is_err());
+    assert!(pip_rs::utils::security::verify_url_safety("https://pypi.org/simple/").is_ok());
+    assert!(pip_rs::utils::security::verify_url_safety("http://example.com").is_ok());
+    assert!(pip_rs::utils::security::verify_url_safety("ftp://example.com").is_err());
+    assert!(pip_rs::utils::security::verify_url_safety("javascript:alert('xss')").is_err());
 
     // Test file path validation edge cases
-    assert!(pip_rs::utils::verify_file_path_safety("/path/to/file").is_ok());
-    assert!(pip_rs::utils::verify_file_path_safety("./relative/path").is_ok());
-    assert!(pip_rs::utils::verify_file_path_safety("path/../../etc/passwd").is_err());
+    assert!(pip_rs::utils::security::verify_file_path_safety("/path/to/file").is_ok());
+    assert!(pip_rs::utils::security::verify_file_path_safety("./relative/path").is_ok());
+    assert!(pip_rs::utils::security::verify_file_path_safety("path/../../etc/passwd").is_err());
 
     // Test command injection prevention
-    assert!(pip_rs::utils::check_command_injection("normal input").is_ok());
-    assert!(pip_rs::utils::check_command_injection("input; rm -rf /").is_err());
-    assert!(pip_rs::utils::check_command_injection("input | cat").is_err());
-    assert!(pip_rs::utils::check_command_injection("input && command").is_err());
+    assert!(pip_rs::utils::security::check_command_injection("normal input").is_ok());
+    assert!(pip_rs::utils::security::check_command_injection("input; rm -rf /").is_err());
+    assert!(pip_rs::utils::security::check_command_injection("input | cat").is_err());
+    assert!(pip_rs::utils::security::check_command_injection("input && command").is_err());
 
     Ok(())
 }
@@ -234,7 +234,7 @@ fn test_coverage_security_edge_cases() -> Result<(), Box<dyn std::error::Error>>
 #[test]
 fn test_coverage_performance_tracking_multiple() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Duration;
-    use pip_rs::utils::PerformanceTracker;
+    use pip_rs::utils::performance::PerformanceTracker;
 
     let tracker = PerformanceTracker::new();
 
@@ -280,7 +280,7 @@ build-backend = "setuptools.build_meta"
 "#;
 
     fs::write(&pyproject_path, content)?;
-    let pyproject = pip_rs::config::PyProject::load(&pyproject_path)?;
+    let pyproject = pip_rs::config::pyproject::PyProject::load(&pyproject_path)?;
 
     assert_eq!(pyproject.get_name(), Some("complex-package".to_string()));
     assert_eq!(pyproject.get_version(), Some("1.0.0".to_string()));
@@ -342,7 +342,7 @@ fn test_coverage_editable_install_cleanup() -> Result<(), Box<dyn std::error::Er
         "[project]\nname = \"test-package\"\n",
     )?;
 
-    let editable = pip_rs::installer::EditableInstall::new(
+    let editable = pip_rs::installer::editable::EditableInstall::new(
         project_dir.clone(),
         site_packages.clone(),
     );
@@ -372,7 +372,7 @@ fn test_coverage_sanitization() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     for (input, _expected) in test_cases {
-        let sanitized = pip_rs::utils::sanitize_output(input);
+        let sanitized = pip_rs::utils::security::sanitize_output(input);
         assert!(!sanitized.contains('\0'));
     }
 
@@ -382,7 +382,7 @@ fn test_coverage_sanitization() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_coverage_timer_functionality() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Duration;
-    use pip_rs::utils::Timer;
+    use pip_rs::utils::performance::Timer;
 
     let timer = Timer::new("test_operation");
     std::thread::sleep(Duration::from_millis(10));
@@ -398,9 +398,9 @@ fn test_coverage_timer_functionality() -> Result<(), Box<dyn std::error::Error>>
 
 #[test]
 fn test_coverage_version_comparison_all_operators() -> Result<(), Box<dyn std::error::Error>> {
-    let v1 = pip_rs::utils::Version::parse("1.0.0")?;
-    let v2 = pip_rs::utils::Version::parse("2.0.0")?;
-    let v3 = pip_rs::utils::Version::parse("1.0.0")?;
+    let v1 = pip_rs::utils::version::Version::parse("1.0.0")?;
+    let v2 = pip_rs::utils::version::Version::parse("2.0.0")?;
+    let v3 = pip_rs::utils::version::Version::parse("1.0.0")?;
 
     // Test all comparison operators
     assert!(v1 < v2);

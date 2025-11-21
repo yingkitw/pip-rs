@@ -3,8 +3,8 @@ use anyhow::{Result, anyhow};
 use reqwest::Client;
 use std::time::Duration;
 
-const MAX_RETRIES: u32 = 3;
-const RETRY_DELAY_MS: u64 = 500;
+const MAX_RETRIES: u32 = 2;
+const RETRY_DELAY_MS: u64 = 200;
 
 pub struct PackageClient {
     client: Client,
@@ -14,8 +14,9 @@ pub struct PackageClient {
 impl PackageClient {
     pub fn new() -> Self {
         let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(10))  // Reduced from 30s
+            .connect_timeout(Duration::from_secs(5))  // Reduced from 10s
+            .pool_max_idle_per_host(10)  // Connection pooling
             .build()
             .unwrap_or_else(|_| Client::new());
         

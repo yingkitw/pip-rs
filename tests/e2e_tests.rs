@@ -93,7 +93,7 @@ fn test_e2e_venv_and_packages() -> Result<(), Box<dyn std::error::Error>> {
     let venv_path = temp_dir.path().join("test_venv");
 
     // Create virtual environment
-    let venv = pip_rs::venv::VirtualEnvironment::new(venv_path.clone(), "3.11".to_string());
+    let venv = pip_rs::venv::environment::VirtualEnvironment::new(venv_path.clone(), "3.11".to_string());
     venv.create()?;
 
     // Verify structure
@@ -123,20 +123,20 @@ fn test_e2e_config_and_cache() -> Result<(), Box<dyn std::error::Error>> {
     let config_path = temp_dir.path().join("pip.conf");
 
     // Create and save config
-    let mut config = pip_rs::config::Config::new();
+    let mut config = pip_rs::config::config::Config::new();
     config.set_timeout(30);
     config.add_extra_index_url("https://test.pypi.org/simple/".to_string());
     config.save_to_file(&config_path)?;
 
     // Load and verify
-    let loaded = pip_rs::config::Config::load_from_file(&config_path)?;
+    let loaded = pip_rs::config::config::Config::load_from_file(&config_path)?;
     assert_eq!(loaded.timeout(), 30);
     assert_eq!(loaded.extra_index_urls().len(), 1);
 
     // Test caching
     let cache_dir = temp_dir.path().join("cache");
     fs::create_dir_all(&cache_dir)?;
-    let cache = pip_rs::cache::PackageCache::new_custom(cache_dir)?;
+    let cache = pip_rs::cache::package_cache::PackageCache::new_custom(cache_dir)?;
 
     // Store and retrieve
     let package = pip_rs::models::Package {
@@ -162,18 +162,18 @@ fn test_e2e_config_and_cache() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_e2e_version_resolution() -> Result<(), Box<dyn std::error::Error>> {
     // Test version parsing and comparison
-    let v1 = pip_rs::utils::Version::parse("2.28.0")?;
-    let v2 = pip_rs::utils::Version::parse("2.29.0")?;
-    let v3 = pip_rs::utils::Version::parse("2.28.0")?;
+    let v1 = pip_rs::utils::version::Version::parse("2.28.0")?;
+    let v2 = pip_rs::utils::version::Version::parse("2.29.0")?;
+    let v3 = pip_rs::utils::version::Version::parse("2.28.0")?;
 
     assert!(v2 > v1);
     assert!(v1 == v3);
     assert!(v1 < v2);
 
     // Test version constraints with standard versions
-    let v1_0 = pip_rs::utils::Version::parse("1.0.0")?;
-    let v2_0 = pip_rs::utils::Version::parse("2.0.0")?;
-    let v2_1 = pip_rs::utils::Version::parse("2.1.0")?;
+    let v1_0 = pip_rs::utils::version::Version::parse("1.0.0")?;
+    let v2_0 = pip_rs::utils::version::Version::parse("2.0.0")?;
+    let v2_1 = pip_rs::utils::version::Version::parse("2.1.0")?;
 
     assert!(v1_0 < v2_0);
     assert!(v2_0 < v2_1);
@@ -223,7 +223,7 @@ fn test_e2e_editable_install_workflow() -> Result<(), Box<dyn std::error::Error>
     )?;
 
     // Install in editable mode
-    let editable = pip_rs::installer::EditableInstall::new(
+    let editable = pip_rs::installer::editable::EditableInstall::new(
         project_dir.clone(),
         site_packages.clone(),
     );
@@ -285,7 +285,7 @@ fn test_e2e_entry_point_generation() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     for (name, module, func) in entry_points {
-        let ep = pip_rs::installer::EntryPoint::new(
+        let ep = pip_rs::installer::entry_point::EntryPoint::new(
             name.to_string(),
             module.to_string(),
             func.to_string(),
@@ -328,7 +328,7 @@ fn test_e2e_site_packages_operations() -> Result<(), Box<dyn std::error::Error>>
 #[test]
 fn test_e2e_cache_operations() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
-    let cache = pip_rs::cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
+    let cache = pip_rs::cache::package_cache::PackageCache::new_custom(temp_dir.path().to_path_buf())?;
 
     // Store multiple packages
     let packages = vec![
@@ -386,23 +386,23 @@ fn test_e2e_marker_evaluation() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_e2e_validation_workflow() -> Result<(), Box<dyn std::error::Error>> {
     // Test package name validation
-    assert!(pip_rs::utils::validate_package_name("requests").is_ok());
-    assert!(pip_rs::utils::validate_package_name("my-package").is_ok());
-    assert!(pip_rs::utils::validate_package_name("").is_err());
+    assert!(pip_rs::utils::validation::validate_package_name("requests").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("my-package").is_ok());
+    assert!(pip_rs::utils::validation::validate_package_name("").is_err());
 
     // Test version validation
-    assert!(pip_rs::utils::validate_version_spec(">=1.0.0").is_ok());
-    assert!(pip_rs::utils::validate_version_spec("==1.0.0").is_ok());
-    assert!(pip_rs::utils::validate_version_spec("").is_err());
+    assert!(pip_rs::utils::validation::validate_version_spec(">=1.0.0").is_ok());
+    assert!(pip_rs::utils::validation::validate_version_spec("==1.0.0").is_ok());
+    assert!(pip_rs::utils::validation::validate_version_spec("").is_err());
 
     // Test URL validation
-    assert!(pip_rs::utils::validate_url("https://pypi.org/simple/").is_ok());
-    assert!(pip_rs::utils::validate_url("http://example.com").is_ok());
-    assert!(pip_rs::utils::validate_url("ftp://example.com").is_err());
+    assert!(pip_rs::utils::validation::validate_url("https://pypi.org/simple/").is_ok());
+    assert!(pip_rs::utils::validation::validate_url("http://example.com").is_ok());
+    assert!(pip_rs::utils::validation::validate_url("ftp://example.com").is_err());
 
     // Test file path validation
-    assert!(pip_rs::utils::validate_file_path("/path/to/file").is_ok());
-    assert!(pip_rs::utils::validate_file_path("").is_err());
+    assert!(pip_rs::utils::validation::validate_file_path("/path/to/file").is_ok());
+    assert!(pip_rs::utils::validation::validate_file_path("").is_err());
 
     Ok(())
 }
@@ -410,7 +410,7 @@ fn test_e2e_validation_workflow() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_e2e_performance_tracking() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Duration;
-    use pip_rs::utils::PerformanceTracker;
+    use pip_rs::utils::performance::PerformanceTracker;
 
     let tracker = PerformanceTracker::new();
 

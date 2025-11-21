@@ -75,7 +75,7 @@ where
         let detector = self.detector.clone();
 
         tokio::spawn(async move {
-            let semaphore = Arc::new(Semaphore::new(5));
+            let semaphore = Arc::new(Semaphore::new(10));
             let mut handles = vec![];
 
             // Spawn all tasks at once for real-time streaming
@@ -128,26 +128,32 @@ where
         }
 
         eprintln!("\r{}", " ".repeat(100));
-        eprintln!("\r[100%] [{}] {}/{} | Scan complete!", "█".repeat(20), total_packages, total_packages);
 
         if outdated_packages.is_empty() {
-            println!("\n✓ All packages are up-to-date!\n");
+            println!("\n  ✓ All packages are up-to-date!\n");
             return Ok(0);
         }
 
         // Display outdated packages found
-        println!("\n📋 Found {} outdated packages. Starting upgrade...\n", outdated_packages.len());
-        println!("{:<50} {:<20} {:<20} {}", "Package", "Current", "Latest", "Status");
-        println!("{}", "-".repeat(100));
+        self.reporter.report_scan_complete(packages.len(), outdated_packages.len());
 
         // Upgrade all packages in parallel
         let results = self.installer.upgrade_parallel(outdated_packages, self.config.concurrency).await;
         
-        // Display results
+        // Display results with better formatting
         let (upgraded_count, failed_count) = results.iter().fold((0, 0), |(up, fail), result| {
-            let status = if result.success { "✓ UPGRADED" } else { "✗ FAILED" };
-            println!("{:<50} {:<20} {:<20} {}", 
-                result.name, result.current_version, result.latest_version, status);
+            let status_icon = if result.success { "✅" } else { "❌" };
+            let status_text = if result.success { "UPGRADED" } else { "FAILED" };
+            
+            // Truncate package name if too long
+            let pkg_name = if result.name.len() > 45 {
+                format!("{}...", &result.name[..42])
+            } else {
+                result.name.clone()
+            };
+            
+            println!("  {status_icon} {:<45} {:<15} {:<15} {}", 
+                pkg_name, result.current_version, result.latest_version, status_text);
             
             if result.success {
                 (up + 1, fail)
@@ -197,7 +203,7 @@ where
         let detector = self.detector.clone();
 
         tokio::spawn(async move {
-            let semaphore = Arc::new(Semaphore::new(5));
+            let semaphore = Arc::new(Semaphore::new(10));
             let mut handles = vec![];
 
             // Spawn all tasks at once for real-time streaming
@@ -250,26 +256,32 @@ where
         }
 
         eprintln!("\r{}", " ".repeat(100));
-        eprintln!("\r[100%] [{}] {}/{} | Scan complete!", "█".repeat(20), total_packages, total_packages);
 
         if outdated_packages.is_empty() {
-            println!("\n✓ All requested packages are up-to-date!\n");
+            println!("\n  ✓ All requested packages are up-to-date!\n");
             return Ok(0);
         }
 
         // Display outdated packages found
-        println!("\n📋 Found {} outdated packages. Starting upgrade...\n", outdated_packages.len());
-        println!("{:<50} {:<20} {:<20} {}", "Package", "Current", "Latest", "Status");
-        println!("{}", "-".repeat(100));
+        self.reporter.report_scan_complete(packages.len(), outdated_packages.len());
 
         // Upgrade all packages in parallel
         let results = self.installer.upgrade_parallel(outdated_packages, self.config.concurrency).await;
         
-        // Display results
+        // Display results with better formatting
         let (upgraded_count, failed_count) = results.iter().fold((0, 0), |(up, fail), result| {
-            let status = if result.success { "✓ UPGRADED" } else { "✗ FAILED" };
-            println!("{:<50} {:<20} {:<20} {}", 
-                result.name, result.current_version, result.latest_version, status);
+            let status_icon = if result.success { "✅" } else { "❌" };
+            let status_text = if result.success { "UPGRADED" } else { "FAILED" };
+            
+            // Truncate package name if too long
+            let pkg_name = if result.name.len() > 45 {
+                format!("{}...", &result.name[..42])
+            } else {
+                result.name.clone()
+            };
+            
+            println!("  {status_icon} {:<45} {:<15} {:<15} {}", 
+                pkg_name, result.current_version, result.latest_version, status_text);
             
             if result.success {
                 (up + 1, fail)
@@ -400,6 +412,6 @@ mod tests {
             UpgradeConfig::default(),
         );
 
-        assert_eq!(handler.config.concurrency, 5);
+        assert_eq!(handler.config.concurrency, 10);
     }
 }
