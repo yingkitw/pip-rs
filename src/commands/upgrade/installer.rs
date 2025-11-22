@@ -1,5 +1,6 @@
 /// Package installation/upgrade functionality
 use std::process::Command;
+use std::io::Write;
 use super::traits::UpgradeResult;
 
 /// Get the installed version of a package
@@ -89,21 +90,39 @@ pub async fn upgrade_packages_parallel(
     concurrency: usize,
 ) -> Vec<UpgradeResult> {
     use std::sync::Arc;
-    use tokio::sync::Semaphore;
+    use tokio::sync::{Semaphore, Mutex};
     use futures::future::join_all;
 
     let semaphore = Arc::new(Semaphore::new(concurrency));
+    let total = packages.len();
+    let completed = Arc::new(Mutex::new(0usize));
     let mut handles = vec![];
 
     for (name, current, latest) in packages {
         let sem = semaphore.clone();
+        let completed_clone = completed.clone();
         let handle = tokio::spawn(async move {
             let _permit = sem.acquire().await.ok();
-            upgrade_package(&name, &current, &latest)
+            let result = upgrade_package(&name, &current, &latest);
+            
+            // Update progress
+            let mut count = completed_clone.lock().await;
+            *count += 1;
+            let current_count = *count;
+            drop(count);
+            
+            // Print progress every 10 packages or at the end
+            if current_count % 10 == 0 || current_count == total {
+                eprint!("\r  Upgraded {}/{} packages...", current_count, total);
+                let _ = std::io::Write::flush(&mut std::io::stderr());
+            }
+            
+            result
         });
         handles.push(handle);
     }
 
     let results = join_all(handles).await;
+    eprintln!("\r  Upgraded {}/{} packages...✓", total, total);
     results.into_iter().filter_map(|r| r.ok()).collect()
 }

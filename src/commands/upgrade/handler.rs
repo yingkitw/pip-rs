@@ -74,7 +74,7 @@ where
         let fetcher = self.fetcher.clone();
         let detector = self.detector.clone();
 
-        tokio::spawn(async move {
+        let scan_task = tokio::spawn(async move {
             let semaphore = Arc::new(Semaphore::new(10));
             let mut handles = vec![];
 
@@ -96,7 +96,8 @@ where
                             let _ = tx_clone.send((name, version, latest, is_outdated)).await;
                         }
                         Err(_) => {
-                            // Silently skip failed requests
+                            // Send a dummy message to indicate task completed
+                            let _ = tx_clone.send((String::new(), String::new(), String::new(), false)).await;
                         }
                     }
                 });
@@ -112,6 +113,12 @@ where
         let mut outdated_packages = Vec::new();
         
         while let Some((name, version, latest, is_outdated)) = rx.recv().await {
+            // Skip empty messages from failed requests
+            if name.is_empty() {
+                checked_count += 1;
+                continue;
+            }
+            
             checked_count += 1;
             
             if is_outdated {
@@ -126,6 +133,9 @@ where
                 break;
             }
         }
+
+        // Ensure the scan task completes
+        let _ = scan_task.await;
 
         eprintln!("\r{}", " ".repeat(100));
 
@@ -202,7 +212,7 @@ where
         let fetcher = self.fetcher.clone();
         let detector = self.detector.clone();
 
-        tokio::spawn(async move {
+        let scan_task = tokio::spawn(async move {
             let semaphore = Arc::new(Semaphore::new(10));
             let mut handles = vec![];
 
@@ -224,7 +234,8 @@ where
                             let _ = tx_clone.send((name, version, latest, is_outdated)).await;
                         }
                         Err(_) => {
-                            // Silently skip failed requests
+                            // Send a dummy message to indicate task completed
+                            let _ = tx_clone.send((String::new(), String::new(), String::new(), false)).await;
                         }
                     }
                 });
@@ -240,6 +251,12 @@ where
         let mut outdated_packages = Vec::new();
         
         while let Some((name, version, latest, is_outdated)) = rx.recv().await {
+            // Skip empty messages from failed requests
+            if name.is_empty() {
+                checked_count += 1;
+                continue;
+            }
+            
             checked_count += 1;
             
             if is_outdated {
@@ -254,6 +271,9 @@ where
                 break;
             }
         }
+
+        // Ensure the scan task completes
+        let _ = scan_task.await;
 
         eprintln!("\r{}", " ".repeat(100));
 
