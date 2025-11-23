@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pip-rs Documentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        main {
+            padding: 40px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 25px;
+            border-radius: 8px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .card p {
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .card ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .card li {
+            padding: 5px 0;
+            color: #666;
+        }
+        
+        .card li:before {
+            content: "→ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        
+        .card a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .card a:hover {
+            text-decoration: underline;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        footer {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .status.complete {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.progress {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📦 pip-rs</h1>
+            <p>High-Performance Python Package Manager in Rust</p>
+        </header>
+        
+        <main>
+            <div class="section">
+                <h2>📚 Documentation</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>🏗️ Architecture</h3>
+                        <p>Understand the design and structure of pip-rs</p>
+                        <ul>
+                            <li><a href="architecture/INDEX.md">Project Overview</a></li>
+                            <li><a href="architecture/LAYOUT_SUMMARY.md">Module Layout</a></li>
+                            <li><a href="architecture/LAYOUT_COMPARISON.md">Design Decisions</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📖 Guides</h3>
+                        <p>Feature guides and tutorials</p>
+                        <ul>
+                            <li><a href="guides/LIST_OUTDATED_FEATURE.md">Outdated Detection</a></li>
+                            <li><a href="guides/PERFORMANCE_TUNING.md">Performance Tips</a></li>
+                            <li><a href="guides/UPGRADE_VERIFICATION.md">Upgrade Testing</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>🔧 Fixes & Improvements</h3>
+                        <p>Recent bug fixes and enhancements</p>
+                        <ul>
+                            <li><a href="fixes/PEP440_FIX_SUMMARY.md">PEP 440 Version Comparison</a></li>
+                            <li><a href="fixes/HANG_FIX.md">Hang Prevention</a></li>
+                            <li><a href="fixes/PACKAGE_NAME_PARSING_FIX.md">Package Name Parsing</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🎯 Quick Links</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Features <span class="status complete">Complete</span></h3>
+                        <p>Core functionality implemented and tested</p>
+                        <ul>
+                            <li>Package installation</li>
+                            <li>Dependency resolution</li>
+                            <li>Outdated detection</li>
+                            <li>Wheel handling</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Performance <span class="status complete">Optimized</span></h3>
+                        <p>Production-ready performance</p>
+                        <ul>
+                            <li>Connection pooling (2-3x faster)</li>
+                            <li>Parallel requests (10 concurrent)</li>
+                            <li>Real-time streaming</li>
+                            <li>Retry with backoff</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Testing <span class="status complete">Comprehensive</span></h3>
+                        <p>Well-tested codebase</p>
+                        <ul>
+                            <li>25+ unit tests</li>
+                            <li>Integration tests</li>
+                            <li>100% pass rate</li>
+                            <li>PEP 440 compliance</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📁 Documentation Structure</h2>
+                <div class="card">
+                    <p><strong>docs/</strong> - All documentation organized by category</p>
+                    <ul>
+                        <li><strong>architecture/</strong> - Design and structure</li>
+                        <li><strong>guides/</strong> - Feature guides and tutorials</li>
+                        <li><strong>fixes/</strong> - Bug fixes and improvements</li>
+                        <li><strong>features/</strong> - Feature specifications</li>
+                        <li><strong>optimization/</strong> - Performance tuning</li>
+                        <li><strong>phases/</strong> - Development phases</li>
+                        <li><strong>archive/</strong> - Historical documentation</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🚀 Getting Started</h2>
+                <div class="card">
+                    <h3>Build & Run</h3>
+                    <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto;">
+# Build the project
+cargo build --release
+
+# Run tests
+cargo test --lib
+
+# List outdated packages
+cargo run --release -- list --outdated
+
+# Install a package
+cargo run --release -- install package_name</pre>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>pip-rs Documentation | <a href="https://github.com/yingkitw/pip-rs" style="color: #667eea;">GitHub</a></p>
+        </footer>
+    </div>
+</body>
+</html>

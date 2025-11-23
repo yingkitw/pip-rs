@@ -118,10 +118,13 @@ src/
 
 ## Documentation
 
-- **[docs/SETUP.md](docs/SETUP.md)** - Development setup
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Project architecture
-- **[docs/features/](docs/features/)** - Feature documentation
-- **[docs/optimization/](docs/optimization/)** - Performance optimization
+See [docs/](docs/) for comprehensive documentation organized by category:
+
+- **Architecture**: [docs/architecture/](docs/architecture/) - Design decisions and structure
+- **Guides**: [docs/guides/](docs/guides/) - Feature guides and tutorials
+- **Fixes**: [docs/fixes/](docs/fixes/) - Bug fixes and improvements
+- **Features**: [docs/features/](docs/features/) - Feature specifications
+- **Optimization**: [docs/optimization/](docs/optimization/) - Performance tuning
 
 ## Status
 

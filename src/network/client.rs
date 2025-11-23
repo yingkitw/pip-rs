@@ -14,8 +14,8 @@ pub struct PackageClient {
 impl PackageClient {
     pub fn new() -> Self {
         let client = Client::builder()
-            .timeout(Duration::from_secs(10))  // Reduced from 30s
-            .connect_timeout(Duration::from_secs(5))  // Reduced from 10s
+            .timeout(Duration::from_secs(180))
+            .connect_timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(10)  // Connection pooling
             .build()
             .unwrap_or_else(|_| Client::new());
