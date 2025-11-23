@@ -120,9 +120,55 @@ impl PackageInstaller {
                     }
                     "scripts" => {
                         // Install to bin directory
-                        // TODO: Implement script installation
+                        self.install_scripts(&path)?;
                     }
                     _ => {}
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn install_scripts(&self, scripts_dir: &Path) -> Result<()> {
+        // Get the bin directory (usually ~/.local/bin or /usr/local/bin)
+        let bin_dir = if cfg!(target_os = "windows") {
+            // On Windows, use Scripts directory
+            if let Ok(home) = std::env::var("USERPROFILE") {
+                std::path::PathBuf::from(home).join("Scripts")
+            } else {
+                std::path::PathBuf::from("Scripts")
+            }
+        } else {
+            // On Unix-like systems, use ~/.local/bin
+            if let Ok(home) = std::env::var("HOME") {
+                std::path::PathBuf::from(home).join(".local").join("bin")
+            } else {
+                std::path::PathBuf::from("/usr/local/bin")
+            }
+        };
+
+        // Create bin directory if it doesn't exist
+        std::fs::create_dir_all(&bin_dir)?;
+
+        // Copy scripts to bin directory
+        for entry in std::fs::read_dir(scripts_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            
+            if path.is_file() {
+                let file_name = entry.file_name();
+                let target = bin_dir.join(&file_name);
+                
+                // Copy the script
+                std::fs::copy(&path, &target)?;
+                
+                // Make executable on Unix
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let perms = std::fs::Permissions::from_mode(0o755);
+                    std::fs::set_permissions(&target, perms)?;
                 }
             }
         }

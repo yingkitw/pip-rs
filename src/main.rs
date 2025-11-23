@@ -18,6 +18,10 @@ use std::process;
 #[command(about = "A high-performance Rust implementation of the Python package installer", long_about = None)]
 #[command(version = "1.0.0-rc.1")]
 struct Cli {
+    /// Enable verbose logging
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -112,12 +116,40 @@ enum Commands {
     },
 }
 
+/// Initialize logging with appropriate verbosity level
+fn init_logging(verbose: bool) {
+    use tracing_subscriber::filter::LevelFilter;
+    
+    let level = if verbose {
+        LevelFilter::DEBUG
+    } else {
+        // Check RUST_LOG environment variable
+        match std::env::var("RUST_LOG") {
+            Ok(val) => match val.to_lowercase().as_str() {
+                "trace" => LevelFilter::TRACE,
+                "debug" => LevelFilter::DEBUG,
+                "info" => LevelFilter::INFO,
+                "warn" => LevelFilter::WARN,
+                "error" => LevelFilter::ERROR,
+                _ => LevelFilter::INFO,
+            },
+            Err(_) => LevelFilter::INFO,
+        }
+    };
+
+    tracing_subscriber::fmt()
+        .with_max_level(level)
+        .with_target(verbose)
+        .with_thread_ids(verbose)
+        .init();
+}
+
 #[tokio::main]
 async fn main() {
-    // Initialize logging
-    tracing_subscriber::fmt::init();
-
     let cli = Cli::parse();
+
+    // Initialize logging based on verbose flag
+    init_logging(cli.verbose);
 
     let result = match cli.command {
         Commands::Install {

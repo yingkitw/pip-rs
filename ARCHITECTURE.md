@@ -46,12 +46,17 @@ src/
 │   ├── resolver.rs            # Main resolution algorithm
 │   ├── lockfile.rs            # Lock file handling
 │   ├── extras.rs              # Extras resolution
+│   ├── dependency_cache.rs    # Dependency caching (Phase 8)
+│   ├── direct_url.rs          # Direct URL support (Phase 8)
+│   ├── candidate_selector.rs  # Candidate selection (Phase 9)
 │   └── version_spec.rs        # Version constraint parsing
 ├── installer/                 # Package installation
 │   ├── mod.rs                 # Installer module root
 │   ├── installer.rs           # Main installation logic
 │   ├── wheel.rs               # Wheel file handling
 │   ├── editable.rs            # Editable installs (.pth)
+│   ├── editable_cache.rs      # Editable caching (Phase 8)
+│   ├── egg_link_handler.rs    # Egg-link handling (Phase 10)
 │   ├── entry_point.rs         # Entry point generation
 │   └── site_packages.rs       # Site-packages management
 ├── cache/                     # Caching mechanisms
@@ -67,12 +72,24 @@ src/
 │   ├── package.rs             # Package metadata
 │   ├── requirement.rs         # Requirement specifications
 │   ├── metadata.rs            # Installation metadata
-│   └── marker.rs              # Environment markers
+│   ├── marker.rs              # Environment markers
+│   └── installation_report.rs # Installation reporting (Phase 9)
+├── venv/                      # Virtual environment management
+│   ├── mod.rs                 # VEnv module root
+│   ├── environment.rs         # VEnv creation and management
+│   ├── activation.rs          # Activation scripts
+│   └── site_packages_handler.rs # Site-packages handling (Phase 8)
 ├── errors.rs                  # Error types and handling
 └── utils/                     # Utility functions
     ├── mod.rs                 # Utils module root
     ├── validation.rs          # Input validation
-    └── security.rs            # Security checks
+    ├── security.rs            # Security checks
+    ├── color.rs               # Color output (Phase 7)
+    ├── benchmark.rs           # Performance benchmarking (Phase 7)
+    ├── environment_markers.rs # Marker evaluation (Phase 8)
+    ├── archive_detector.rs    # Archive detection (Phase 9)
+    ├── requirements_parser.rs # Requirements parsing (Phase 9)
+    └── find_links_tracker.rs  # Find-links tracking (Phase 9)
 ```
 
 ## Key Design Patterns

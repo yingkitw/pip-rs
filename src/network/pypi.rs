@@ -3,10 +3,46 @@ use crate::models::Package;
 use anyhow::{Result, anyhow};
 
 pub async fn search_package(query: &str) -> Result<Vec<Package>> {
-    // TODO: Implement PyPI search API
-    // This would call the PyPI JSON API
-    let _ = query;
-    Ok(Vec::new())
+    // Use PyPI JSON API to search for packages
+    // Note: PyPI deprecated the simple search API, so we use the JSON API
+    match super::GLOBAL_CLIENT.get_package_info(query).await {
+        Ok(response) => {
+            // Try to parse as a single package
+            if let Some(info) = response.get("info") {
+                let package = Package {
+                    name: info["name"].as_str().unwrap_or(query).to_string(),
+                    version: info["version"].as_str().unwrap_or("unknown").to_string(),
+                    summary: info["summary"].as_str().map(|s| s.to_string()),
+                    home_page: info["home_page"].as_str().map(|s| s.to_string()),
+                    author: info["author"].as_str().map(|s| s.to_string()),
+                    license: info["license"].as_str().map(|s| s.to_string()),
+                    requires_python: info["requires_python"].as_str().map(|s| s.to_string()),
+                    requires_dist: info["requires_dist"]
+                        .as_array()
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    classifiers: info["classifiers"]
+                        .as_array()
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                };
+                return Ok(vec![package]);
+            }
+            Ok(Vec::new())
+        }
+        Err(_) => {
+            // Package not found or network error
+            Ok(Vec::new())
+        }
+    }
 }
 
 /// Find the best wheel URL for a package version

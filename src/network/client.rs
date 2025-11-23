@@ -1,14 +1,18 @@
-/// HTTP client for package operations with retry logic
+/// HTTP client for package operations with retry logic and disk caching
 use anyhow::{Result, anyhow};
 use reqwest::Client;
 use std::time::Duration;
+use std::path::PathBuf;
+use crate::cache::DiskCache;
 
 const MAX_RETRIES: u32 = 2;
 const RETRY_DELAY_MS: u64 = 200;
+const CACHE_TTL_SECS: u64 = 3600; // 1 hour cache TTL
 
 pub struct PackageClient {
     client: Client,
     base_url: String,
+    cache: Option<DiskCache>,
 }
 
 impl PackageClient {
@@ -20,10 +24,33 @@ impl PackageClient {
             .build()
             .unwrap_or_else(|_| Client::new());
         
+        // Initialize disk cache
+        let cache = Self::init_cache();
+        
         Self {
             client,
             base_url: "https://pypi.org/pypi".to_string(),
+            cache,
         }
+    }
+
+    /// Initialize disk cache in user's cache directory
+    fn init_cache() -> Option<DiskCache> {
+        if let Ok(cache_dir) = std::env::var("PIP_CACHE_DIR") {
+            let path = PathBuf::from(cache_dir);
+            if let Ok(cache) = DiskCache::new(&path, Duration::from_secs(CACHE_TTL_SECS)) {
+                return Some(cache);
+            }
+        }
+        
+        // Try default cache location
+        if let Some(cache_home) = dirs::cache_dir().map(|d| d.join("pip-rs")) {
+            if let Ok(cache) = DiskCache::new(&cache_home, Duration::from_secs(CACHE_TTL_SECS)) {
+                return Some(cache);
+            }
+        }
+        
+        None
     }
 
     #[allow(dead_code)]
@@ -43,15 +70,38 @@ impl PackageClient {
         self.download_with_retry(url).await
     }
 
-    /// Get with exponential backoff retry
+    /// Get with exponential backoff retry and disk caching
     async fn get_with_retry(&self, url: &str) -> Result<serde_json::Value> {
+        // Try cache first
+        if let Some(cache) = &self.cache {
+            if let Ok(Some(cached_data)) = cache.get(url) {
+                if let Ok(json) = serde_json::from_slice(&cached_data) {
+                    tracing::debug!("Cache hit for {}", url);
+                    return Ok(json);
+                }
+            }
+        }
+        
         let mut last_error = None;
         
         for attempt in 0..MAX_RETRIES {
             match self.client.get(url).send().await {
                 Ok(response) => {
                     if response.status().is_success() {
-                        return response.json().await.map_err(|e| anyhow!("Failed to parse JSON: {}", e));
+                        match response.json::<serde_json::Value>().await {
+                            Ok(json) => {
+                                // Cache the result
+                                if let Some(cache) = &self.cache {
+                                    if let Ok(json_str) = serde_json::to_string(&json) {
+                                        let _ = cache.set(url, json_str.as_bytes());
+                                    }
+                                }
+                                return Ok(json);
+                            }
+                            Err(e) => {
+                                return Err(anyhow!("Failed to parse JSON: {}", e));
+                            }
+                        }
                     } else if response.status().is_client_error() {
                         return Err(anyhow!("Client error: {}", response.status()));
                     }
