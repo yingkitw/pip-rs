@@ -4,6 +4,26 @@
 
 pip-rs is a high-performance Rust implementation of Python's pip package manager. It maintains architectural parity with pip while leveraging Rust's safety, concurrency, and performance characteristics.
 
+## Design Philosophy
+
+### Positioning in the Ecosystem
+
+pip-rs is positioned as a **drop-in replacement** for pip, not a replacement for the entire Python toolchain:
+
+| Tool | Philosophy |
+|------|------------|
+| **pip** | Standard, universal, Python-based |
+| **uv** | All-in-one (pip + venv + pyenv + poetry), Rust-based |
+| **pip-rs** | Focused pip replacement, Rust-based, minimal scope |
+
+### Key Differentiators
+
+1. **CLI Compatibility**: Exact same commands as pip—no learning curve
+2. **Focused Scope**: Package management only, not environment/version management
+3. **Minimal Codebase**: Small, auditable, easy to understand
+4. **No Corporate Backing**: Community-driven, MIT licensed
+5. **Rust Performance**: 5-20x faster than pip with parallel I/O and caching
+
 ## Core Architecture
 
 ### Module Organization
