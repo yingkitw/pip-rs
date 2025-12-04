@@ -119,38 +119,40 @@ cargo install --path .
 #### Build Only
 ```bash
 cargo build --release
-# Binary at target/release/pip
+# Binary at target/release/pip-rs
 ```
 
 ### Commands
 ```bash
 # Install packages
-pip install package_name
-pip install -r requirements.txt
+pip-rs install package_name
+pip-rs install -r requirements.txt
 
 # Uninstall packages
-pip uninstall package_name
-pip uninstall package_name --yes  # Skip confirmation
+pip-rs uninstall package_name
+pip-rs uninstall package_name --yes  # Skip confirmation
 
 # List installed packages
-pip list
+pip-rs list
 
 # Check for outdated packages
-pip list --outdated
+pip-rs list --outdated
 
 # Update all outdated packages
-pip update
+pip-rs update
 
 # Show package information
-pip show package_name
+pip-rs show package_name
 
 # Search for packages
-pip search query
+pip-rs search query
 
 # Generate requirements.txt from installed packages
-pip freeze
-pip freeze -o requirements.txt
+pip-rs freeze
+pip-rs freeze -o requirements.txt
 ```
+
+> **Tip**: Create an alias `alias pip=pip-rs` in your shell config for drop-in replacement.
 
 ## Testing
 
