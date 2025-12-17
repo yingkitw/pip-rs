@@ -27,8 +27,10 @@ pub struct DefaultMetadataFetcher;
 #[async_trait]
 impl MetadataFetcher for DefaultMetadataFetcher {
     async fn fetch_latest(&self, name: &str) -> Result<String> {
-        let pkg = get_package_metadata(name, "latest").await?;
-        Ok(pkg.version)
+        // For version checking, we need fresh data from PyPI, not cached
+        // Use get_latest_version which bypasses cache for accurate outdated detection
+        use crate::network::pypi::get_latest_version;
+        get_latest_version(name).await
     }
 }
 
@@ -38,15 +40,17 @@ pub struct DefaultPackageInstaller;
 #[async_trait]
 impl PackageInstaller for DefaultPackageInstaller {
     async fn upgrade(&self, name: &str, current: &str, latest: &str) -> UpgradeResult {
-        crate::commands::upgrade::installer::upgrade_package(name, current, latest)
+        // Use fast native upgrade (async)
+        crate::commands::upgrade::installer::upgrade_package_fast(name, current, latest).await
     }
     
     async fn upgrade_parallel(
         &self,
         packages: Vec<(String, String, String)>,
-        concurrency: usize,
+        _concurrency: usize,
     ) -> Vec<UpgradeResult> {
-        crate::commands::upgrade::installer::upgrade_packages_parallel(packages, concurrency).await
+        // Try batch upgrade first (fastest), fall back to parallel if needed
+        crate::commands::upgrade::installer::upgrade_packages_batch(packages).await
     }
 }
 
@@ -91,7 +95,7 @@ impl ProgressReporter for DefaultProgressReporter {
         if outdated_count > 0 {
             println!("\n  📦 Found {outdated_count} outdated package{} to upgrade", 
                 if outdated_count == 1 { "" } else { "s" });
-            println!("  ⚡ Starting parallel upgrade (10 concurrent)...\n");
+            println!("  ⚡ Starting fast batch upgrade...\n");
             println!("  {:<45} {:<15} {:<15} {:<12}", "Package", "Current", "Latest", "Status");
             println!("  {}", "-".repeat(90));
         }

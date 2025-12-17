@@ -132,16 +132,24 @@ pub fn suggest_fix(error: &str) -> Option<String> {
         Some("You may need to run with elevated privileges or check file permissions".to_string())
     } else if error.contains("Connection refused") {
         Some("Check your internet connection and PyPI server availability".to_string())
-    } else if error.contains("Timeout") {
-        Some("The request timed out. Try again or check your network connection".to_string())
+    } else if error.contains("Timeout") || error.contains("timed out") {
+        Some("The request timed out. Try again or check your network connection. For large packages, consider using --timeout to increase the timeout".to_string())
     } else if error.contains("DNS") {
         Some("DNS resolution failed. Check your internet connection".to_string())
-    } else if error.contains("404") {
-        Some("The requested resource was not found. Check the package name and version".to_string())
+    } else if error.contains("404") || error.contains("not found") {
+        Some("The requested resource was not found. Check the package name and version. Try: pip search <package-name>".to_string())
     } else if error.contains("403") {
-        Some("Access denied. You may need authentication credentials".to_string())
-    } else if error.contains("500") {
-        Some("PyPI server error. Try again later".to_string())
+        Some("Access denied. You may need authentication credentials or check if the package requires special access".to_string())
+    } else if error.contains("500") || error.contains("502") || error.contains("503") {
+        Some("PyPI server error. Try again later or use --retries to increase retry attempts".to_string())
+    } else if error.contains("SSL") || error.contains("certificate") || error.contains("TLS") {
+        Some("SSL certificate error. If this is a trusted host, use --trusted-host <hostname>".to_string())
+    } else if error.contains("Invalid requirement") {
+        Some("Check the requirement format. Use 'package==version' or 'package>=version'. See PEP 508 for details".to_string())
+    } else if error.contains("Dependency conflict") {
+        Some("Try upgrading conflicting packages or use --no-deps to skip dependency checks".to_string())
+    } else if error.contains("Failed to parse JSON") {
+        Some("The response from PyPI was invalid. This may be a temporary issue. Try again later".to_string())
     } else {
         None
     }

@@ -2,10 +2,11 @@
 use crate::errors::PipError;
 use anyhow::Result;
 use std::fs;
+use pip_rs_core::installer;
 
 pub async fn handle_freeze(output: Option<String>) -> Result<i32, PipError> {
     // Get installed packages
-    let site_packages = crate::installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
+    let site_packages = installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
         package: "site-packages".to_string(),
         reason: e.to_string(),
     })?;

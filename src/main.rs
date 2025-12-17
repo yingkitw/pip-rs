@@ -1,26 +1,32 @@
 mod cli;
 mod commands;
-mod models;
-mod network;
-mod resolver;
-mod utils;
-mod installer;
-mod cache;
-mod venv;
-mod config;
-mod errors;
+
+// Re-export core modules so they are available as crate::... in submodules
+pub use pip_rs_core::errors;
+pub use pip_rs_core::models;
+pub use pip_rs_core::network;
+pub use pip_rs_core::resolver;
+pub use pip_rs_core::installer;
+pub use pip_rs_core::utils;
+pub use pip_rs_core::cache;
+pub use pip_rs_core::venv;
+pub use pip_rs_core::config;
 
 use clap::{Parser, Subcommand};
 use std::process;
 
 #[derive(Parser)]
 #[command(name = "pip")]
-#[command(about = "A high-performance Rust implementation of the Python package installer", long_about = None)]
-#[command(version = "1.0.0-rc.1")]
+#[command(about = "The fastest pip-compatible package installer", long_about = None)]
+#[command(version = "1.0.0")]
 struct Cli {
     /// Enable verbose logging
     #[arg(short, long, global = true)]
     verbose: bool,
+
+    /// Quiet mode - minimal output
+    #[arg(short, long, global = true)]
+    quiet: bool,
 
     #[command(subcommand)]
     command: Commands,
@@ -36,6 +42,14 @@ enum Commands {
         /// Requirements file
         #[arg(short, long)]
         requirements: Option<String>,
+
+        /// Constraints file
+        #[arg(short = 'c', long)]
+        constraints: Option<String>,
+
+        /// Trusted host (can be specified multiple times)
+        #[arg(long)]
+        trusted_host: Vec<String>,
 
         /// Target directory for installation
         #[arg(short, long)]
@@ -117,10 +131,18 @@ enum Commands {
 }
 
 /// Initialize logging with appropriate verbosity level
-fn init_logging(verbose: bool) {
+fn init_logging(verbose: bool, quiet: bool) {
     use tracing_subscriber::filter::LevelFilter;
     
-    let level = if verbose {
+    // Set PIP_QUIET env var for progress bar checks
+    if quiet {
+        // SAFETY: We're setting a single env var at startup before any threads spawn
+        unsafe { std::env::set_var("PIP_QUIET", "1") };
+    }
+    
+    let level = if quiet {
+        LevelFilter::ERROR
+    } else if verbose {
         LevelFilter::DEBUG
     } else {
         // Check RUST_LOG environment variable
@@ -148,16 +170,18 @@ fn init_logging(verbose: bool) {
 async fn main() {
     let cli = Cli::parse();
 
-    // Initialize logging based on verbose flag
-    init_logging(cli.verbose);
+    // Initialize logging based on verbose/quiet flags
+    init_logging(cli.verbose, cli.quiet);
 
     let result = match cli.command {
         Commands::Install {
             packages,
             requirements,
+            constraints,
+            trusted_host,
             target,
         } => {
-            commands::install::handle_install(packages, requirements, target).await
+            commands::install::handle_install(packages, requirements, constraints, trusted_host, target).await
         }
         Commands::Uninstall { packages, yes } => {
             commands::uninstall::handle_uninstall(packages, yes).await

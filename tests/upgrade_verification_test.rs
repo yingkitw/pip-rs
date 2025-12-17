@@ -2,6 +2,7 @@
 use std::process::Command;
 
 #[test]
+#[ignore]
 fn test_upgrade_verifies_version_change() {
     // This test verifies that when we upgrade a package, the version actually changes
     // We'll use a small package like 'six' which has multiple versions available

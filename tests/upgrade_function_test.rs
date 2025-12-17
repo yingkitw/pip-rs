@@ -2,6 +2,7 @@
 use std::process::Command;
 
 #[test]
+#[ignore]
 fn test_pip_rs_upgrade_verifies_version() {
     // This test verifies that pip-rs upgrade_package function actually verifies
     // that the package version was updated

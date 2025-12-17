@@ -1,32 +1,36 @@
 [package]
 name = "pip-rs"
-version = "1.0.0-rc.1"
-edition = "2021"
+version = "0.1.0"
+edition = "2024"
 description = "A high-performance Rust implementation of pip - the Python package installer"
 license = "Apache-2.0"
-authors = ["pip-rs contributors"]
-repository = "https://github.com/yourusername/pip-rs"
-homepage = "https://github.com/yourusername/pip-rs"
-documentation = "https://github.com/yourusername/pip-rs/blob/main/README.md"
+authors = ["Ying Kit WONG"]
+repository = "https://github.com/yingkitw/pip-rs"
+homepage = "https://github.com/yingkitw/pip-rs"
+documentation = "https://github.com/yingkitw/pip-rs/blob/main/README.md"
 readme = "README.md"
 keywords = ["pip", "package", "manager", "python", "rust"]
 categories = ["command-line-utilities", "development-tools"]
 
+[workspace]
+members = ["crates/pip-rs-core"]
+
 [dependencies]
+# Core logic
+pip-rs-core = { path = "crates/pip-rs-core" }
+
 # CLI and argument parsing
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 
-# HTTP and networking
-reqwest = { version = "0.11", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
+# HTTP and networking (re-export or use from core if needed, but commands might use reqwest directly?)
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "io-util", "fs", "sync", "macros"] }
 bytes = "1.5"
+url = "2.5"
 
-# JSON handling and repair
+# JSON handling
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# Markdown parsing
-pulldown-cmark = "0.9"
 
 # File and path handling
 walkdir = "2"
@@ -47,8 +51,12 @@ glob = "0.3"
 
 # Performance optimizations
 lazy_static = "1.4"
+once_cell = "1.19"
 futures = "0.3"
 dirs = "5.0"
+
+# Progress bars and UX
+indicatif = "0.17"
 
 # Async traits
 async-trait = "0.1"
@@ -68,7 +76,7 @@ md5 = "0.7"
 colored = "2.0"
 
 # Testing
-insta = { version = "1.34", features = ["yaml"] }
+insta = { version = "1.34", features = ["yaml"], default-features = false }
 
 [dev-dependencies]
 tokio-test = "0.4"
@@ -84,3 +92,6 @@ path = "src/main.rs"
 [profile.release]
 opt-level = 3
 lto = true
+codegen-units = 1  # Better optimization, smaller binary
+strip = true  # Strip symbols for smaller binary size
+panic = "abort"  # Smaller binary (no unwinding code)

@@ -1,6 +1,7 @@
 /// Uninstall command implementation
 use crate::errors::PipError;
 use std::io::{self, BufRead};
+use pip_rs_core::installer;
 
 pub async fn handle_uninstall(packages: Vec<String>, yes: bool) -> Result<i32, PipError> {
     if packages.is_empty() {
@@ -34,11 +35,11 @@ pub async fn handle_uninstall(packages: Vec<String>, yes: bool) -> Result<i32, P
     }
 
     // Uninstall packages
-    let site_packages = crate::installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
+    let site_packages = installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
         package: "site-packages".to_string(),
         reason: e.to_string(),
     })?;
-    let installer = crate::installer::PackageInstaller::new(site_packages);
+    let installer = installer::PackageInstaller::new(site_packages);
     
     let mut uninstalled_count = 0;
     let mut failed_count = 0;

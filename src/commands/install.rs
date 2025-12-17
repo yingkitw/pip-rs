@@ -1,11 +1,15 @@
 /// Install command implementation
 use crate::errors::PipError;
+use crate::utils::progress;
 use tempfile::TempDir;
 use std::path::Path;
+use pip_rs_core::{installer, models, config, resolver, network};
 
 pub async fn handle_install(
     packages: Vec<String>,
     requirements: Option<String>,
+    constraints: Option<String>,
+    trusted_hosts: Vec<String>,
     _target: Option<String>,
 ) -> Result<i32, PipError> {
     if packages.is_empty() && requirements.is_none() {
@@ -37,12 +41,33 @@ pub async fn handle_install(
         }
     }
 
+    // Parse constraints file if provided
+    let mut constraint_reqs = Vec::new();
+    if let Some(constraints_file) = constraints {
+        let contents = std::fs::read_to_string(&constraints_file).map_err(|e| PipError::FileSystemError {
+            path: constraints_file.clone(),
+            operation: "read".to_string(),
+            reason: e.to_string(),
+        })?;
+        for line in contents.lines() {
+            let line = line.trim();
+            if !line.is_empty() && !line.starts_with('#') {
+                match line.parse::<models::Requirement>() {
+                    Ok(req) => constraint_reqs.push(req),
+                    Err(e) => {
+                        tracing::warn!("Invalid constraint: {} - {}", line, e);
+                    }
+                }
+            }
+        }
+    }
+
     println!("Collecting packages...");
 
     // Parse requirements
     let mut parsed_reqs = Vec::new();
     for req_str in all_requirements {
-        match req_str.parse::<crate::models::Requirement>() {
+        match req_str.parse::<models::Requirement>() {
             Ok(req) => {
                 if req.extras.is_empty() {
                     println!("  - {}", req.name);
@@ -67,9 +92,24 @@ pub async fn handle_install(
         });
     }
 
+    // Load config and merge trusted hosts
+    let mut config = config::config::Config::new();
+    for host in trusted_hosts {
+        config.add_trusted_host(host);
+    }
+    
+    // Smart defaults: Auto-detect venv
+    let venv_path = std::env::var("VIRTUAL_ENV").ok();
+    if let Some(ref venv) = venv_path {
+        tracing::debug!("Detected virtual environment: {}", venv);
+    }
+
     // Resolve dependencies
     println!("\nResolving dependencies...");
-    let mut resolver = crate::resolver::Resolver::new();
+    let mut resolver = resolver::Resolver::new();
+    if !constraint_reqs.is_empty() {
+        resolver.set_constraints(constraint_reqs);
+    }
     let resolved = resolver.resolve(parsed_reqs).await.map_err(|e| PipError::InstallationFailed {
         package: "dependencies".to_string(),
         reason: e.to_string(),
@@ -81,33 +121,53 @@ pub async fn handle_install(
     }
 
     // Download and install packages
-    println!("\nDownloading and installing packages...");
-    
     let temp_dir = TempDir::new().map_err(|e| PipError::FileSystemError {
         path: "temp".to_string(),
         operation: "create directory".to_string(),
         reason: e.to_string(),
     })?;
+    
+    let total = resolved.len();
+    let pb = if progress::is_quiet() {
+        None
+    } else {
+        Some(progress::progress_bar(total as u64, "Installing"))
+    };
+    
     let mut installed_count = 0;
     let mut failed_count = 0;
 
     for pkg in &resolved {
+        if let Some(prog) = &pb {
+            prog.set_message(format!("{} {}", pkg.name, pkg.version));
+        }
+        
         match install_package(pkg, temp_dir.path()).await {
             Ok(_) => {
-                println!("✓ Successfully installed {} {}", pkg.name, pkg.version);
                 installed_count += 1;
             }
             Err(e) => {
-                eprintln!("✗ Failed to install {} {}: {}", pkg.name, pkg.version, e);
+                if !progress::is_quiet() {
+                    eprintln!("✗ Failed to install {} {}: {}", pkg.name, pkg.version, e);
+                }
                 failed_count += 1;
             }
         }
+        
+        if let Some(prog) = &pb {
+            prog.inc(1);
+        }
     }
 
-    println!("\nInstallation complete!");
-    println!("  Successfully installed: {}", installed_count);
+    if let Some(pb) = pb {
+        if failed_count > 0 {
+            progress::finish_error(&pb, &format!("Installed {} packages ({} failed)", installed_count, failed_count));
+        } else {
+            progress::finish_success(&pb, &format!("Installed {} packages", installed_count));
+        }
+    }
+
     if failed_count > 0 {
-        println!("  Failed: {}", failed_count);
         return Ok(1);
     }
 
@@ -115,9 +175,9 @@ pub async fn handle_install(
 }
 
 /// Install a single package by downloading and extracting its wheel
-async fn install_package(pkg: &crate::models::Package, temp_dir: &Path) -> Result<(), PipError> {
+async fn install_package(pkg: &models::Package, temp_dir: &Path) -> Result<(), PipError> {
     // Find wheel URL
-    let wheel_url = crate::network::find_wheel_url(&pkg.name, &pkg.version)
+    let wheel_url = network::find_wheel_url(&pkg.name, &pkg.version)
         .await
         .map_err(|e| PipError::PackageNotFound {
             name: pkg.name.clone(),
@@ -125,13 +185,13 @@ async fn install_package(pkg: &crate::models::Package, temp_dir: &Path) -> Resul
         })?;
     
     // Download wheel
-    eprintln!("  Downloading {} from {}", pkg.name, wheel_url);
-    let wheel_data = crate::network::PackageClient::new()
+    // eprintln!("  Downloading {} from {}", pkg.name, wheel_url);
+    let wheel_data = network::PackageClient::new()
         .download_package(&wheel_url)
         .await
         .map_err(|e| PipError::NetworkError {
-            message: format!("Failed to download {}", wheel_url),
-            retries: 3, // Placeholder
+            message: format!("Failed to download {}", pkg.name),
+            retries: 0,
             last_error: e.to_string(),
         })?;
     
@@ -145,15 +205,15 @@ async fn install_package(pkg: &crate::models::Package, temp_dir: &Path) -> Resul
     })?;
     
     // Extract and install wheel
-    let wheel = crate::installer::wheel::WheelFile::new(wheel_path).map_err(|e| PipError::InstallationFailed {
+    let wheel = installer::wheel::WheelFile::new(wheel_path).map_err(|e| PipError::InstallationFailed {
         package: pkg.name.clone(),
         reason: e.to_string(),
     })?;
-    let site_packages = crate::installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
+    let site_packages = installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
         package: pkg.name.clone(),
         reason: e.to_string(),
     })?;
-    let installer = crate::installer::PackageInstaller::new(site_packages);
+    let installer = installer::PackageInstaller::new(site_packages);
     installer.install_wheel(&wheel).await.map_err(|e| PipError::InstallationFailed {
         package: pkg.name.clone(),
         reason: e.to_string(),

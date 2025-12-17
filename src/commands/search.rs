@@ -1,10 +1,11 @@
 /// Search command implementation
 use crate::errors::PipError;
+use pip_rs_core::network;
 
 pub async fn handle_search(query: &str) -> Result<i32, PipError> {
     println!("Searching for packages matching '{}'...", query);
     
-    match crate::network::search_package(query).await {
+    match network::search_package(query).await {
         Ok(packages) => {
             if packages.is_empty() {
                 println!("No packages found");

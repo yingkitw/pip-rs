@@ -38,7 +38,62 @@ pub fn compare_versions(current: &str, latest: &str) -> Ordering {
     }
 }
 
+/// Fast package detection using pip-rs site-packages handler
 pub fn get_installed_packages() -> Result<Vec<InstalledPackage>> {
+    use crate::installer::site_packages::SitePackages;
+    
+    // Use pip-rs native site-packages detection (faster, auto-detects venv)
+    match SitePackages::default() {
+        Ok(site_packages) => {
+            match site_packages.get_installed_packages() {
+                Ok(_pkg_names) => {
+                    // Fast path: parse versions directly from .dist-info directories
+                    // This is faster than calling get_installed_packages() which does extra work
+                    let mut packages = Vec::new();
+                    let site_path = site_packages.path();
+                    
+                    if let Ok(entries) = fs::read_dir(site_path) {
+                        for entry in entries.flatten() {
+                            let entry_path = entry.path();
+                            if let Some(name) = entry_path.file_name() {
+                                if let Some(name_str) = name.to_str() {
+                                    if name_str.ends_with(".dist-info") {
+                                        let pkg_info = name_str.trim_end_matches(".dist-info");
+                                        
+                                        // Find the version part (starts with a digit)
+                                        let mut version_start = pkg_info.len();
+                                        for (i, ch) in pkg_info.char_indices().rev() {
+                                            if ch == '-' && i + 1 < pkg_info.len() {
+                                                if let Some(next_ch) = pkg_info[i + 1..].chars().next() {
+                                                    if next_ch.is_ascii_digit() {
+                                                        version_start = i;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        if version_start < pkg_info.len() {
+                                            let pkg_name = pkg_info[..version_start].to_string();
+                                            let version = pkg_info[version_start + 1..].to_string();
+                                            packages.push(InstalledPackage { name: pkg_name, version });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(packages)
+                }
+                Err(_) => get_installed_packages_fallback(),
+            }
+        }
+        Err(_) => get_installed_packages_fallback(),
+    }
+}
+
+/// Fallback package detection for compatibility
+fn get_installed_packages_fallback() -> Result<Vec<InstalledPackage>> {
     let mut packages = Vec::new();
     
     // Common site-packages locations (macOS, Linux, Windows)
@@ -72,9 +127,6 @@ pub fn get_installed_packages() -> Result<Vec<InstalledPackage>> {
                     if let Some(name) = entry_path.file_name() {
                         if let Some(name_str) = name.to_str() {
                             if name_str.ends_with(".dist-info") {
-                                // Parse package name and version from .dist-info directory name
-                                // Format: {name}-{version}.dist-info
-                                // The version starts with a digit, so find the last dash before a digit
                                 let pkg_info = name_str.trim_end_matches(".dist-info");
                                 
                                 // Find the version part (starts with a digit)

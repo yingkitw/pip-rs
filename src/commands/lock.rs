@@ -2,6 +2,7 @@
 use crate::errors::PipError;
 use anyhow::Result;
 use std::path::Path;
+use pip_rs_core::{models, resolver, network, installer};
 
 pub async fn handle_lock(
     requirements: Option<String>,
@@ -45,7 +46,7 @@ pub async fn handle_lock(
     // Parse requirements
     let mut parsed_reqs = Vec::new();
     for req_str in all_requirements {
-        match req_str.parse::<crate::models::Requirement>() {
+        match req_str.parse::<models::Requirement>() {
             Ok(req) => {
                 println!("  - {}", req.name);
                 parsed_reqs.push(req);
@@ -63,7 +64,7 @@ pub async fn handle_lock(
 
     // Resolve dependencies
     println!("\nResolving dependencies...");
-    let mut resolver = crate::resolver::Resolver::new();
+    let mut resolver = resolver::Resolver::new();
     let resolved = resolver.resolve(parsed_reqs).await.map_err(|e| PipError::DependencyResolutionError {
         package: "requirements".to_string(),
         reason: e.to_string(),
@@ -77,7 +78,7 @@ pub async fn handle_lock(
     // Create lock file
     println!("\nGenerating lock file...");
     let python_version = format!("{}.{}", 3, 11); // Default to 3.11
-    let lockfile = crate::resolver::LockFile::from_packages(resolved, python_version);
+    let lockfile = resolver::LockFile::from_packages(resolved, python_version);
 
     // Validate lock file
     lockfile.validate().map_err(|e| PipError::InvalidPackage {
@@ -112,7 +113,7 @@ pub async fn handle_lock_install(
     println!("Reading lock file: {}", lock_file);
 
     // Load lock file
-    let lockfile = crate::resolver::LockFile::load(Path::new(&lock_file)).map_err(|e| PipError::FileSystemError {
+    let lockfile = resolver::LockFile::load(Path::new(&lock_file)).map_err(|e| PipError::FileSystemError {
         path: lock_file.clone(),
         operation: "load".to_string(),
         reason: e.to_string(),
@@ -167,16 +168,16 @@ pub async fn handle_lock_install(
 }
 
 /// Install a single package by downloading and extracting its wheel
-async fn install_package(pkg: &crate::models::Package, temp_dir: &std::path::Path) -> Result<(), PipError> {
+async fn install_package(pkg: &models::Package, temp_dir: &std::path::Path) -> Result<(), PipError> {
     // Find wheel URL
-    let wheel_url = crate::network::find_wheel_url(&pkg.name, &pkg.version).await.map_err(|e| PipError::PackageNotFound {
+    let wheel_url = network::find_wheel_url(&pkg.name, &pkg.version).await.map_err(|e| PipError::PackageNotFound {
         name: pkg.name.clone(),
         version: Some(pkg.version.clone()),
     })?;
     
     // Download wheel
     eprintln!("  Downloading {} from {}", pkg.name, wheel_url);
-    let wheel_data = crate::network::PackageClient::new()
+    let wheel_data = network::PackageClient::new()
         .download_package(&wheel_url)
         .await
         .map_err(|e| PipError::NetworkError {
@@ -195,15 +196,15 @@ async fn install_package(pkg: &crate::models::Package, temp_dir: &std::path::Pat
     })?;
     
     // Extract and install wheel
-    let wheel = crate::installer::wheel::WheelFile::new(wheel_path).map_err(|e| PipError::InvalidPackage {
+    let wheel = installer::wheel::WheelFile::new(wheel_path).map_err(|e| PipError::InvalidPackage {
         name: pkg.name.clone(),
         reason: e.to_string(),
     })?;
-    let site_packages = crate::installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
+    let site_packages = installer::SitePackages::default().map_err(|e| PipError::InstallationFailed {
         package: pkg.name.clone(),
         reason: e.to_string(),
     })?;
-    let installer = crate::installer::PackageInstaller::new(site_packages);
+    let installer = installer::PackageInstaller::new(site_packages);
     installer.install_wheel(&wheel).await.map_err(|e| PipError::InstallationFailed {
         package: pkg.name.clone(),
         reason: e.to_string(),

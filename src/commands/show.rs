@@ -1,10 +1,11 @@
 /// Show command implementation
 use crate::errors::PipError;
+use pip_rs_core::network;
 
 pub async fn handle_show(package: &str) -> Result<i32, PipError> {
     println!("Fetching information for package: {}", package);
     
-    match crate::network::get_package_metadata(package, "latest").await {
+    match network::get_package_metadata(package, "latest").await {
         Ok(pkg) => {
             println!("Name: {}", pkg.name);
             println!("Version: {}", pkg.version);

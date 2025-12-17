@@ -26,11 +26,11 @@ pub trait MetadataFetcher: Send + Sync {
 /// Trait for package installation
 #[async_trait]
 pub trait PackageInstaller: Send + Sync {
-    /// Upgrade a single package
+    /// Upgrade a single package (fast native implementation)
     #[allow(dead_code)]
     async fn upgrade(&self, name: &str, current: &str, latest: &str) -> UpgradeResult;
     
-    /// Upgrade multiple packages in parallel
+    /// Upgrade multiple packages - uses batch installation for maximum speed
     async fn upgrade_parallel(
         &self,
         packages: Vec<(String, String, String)>,
@@ -81,7 +81,7 @@ pub struct UpgradeConfig {
 impl Default for UpgradeConfig {
     fn default() -> Self {
         Self {
-            concurrency: 10,
+            concurrency: 15, // Balanced for speed without rate limiting
             verbose: false,
         }
     }

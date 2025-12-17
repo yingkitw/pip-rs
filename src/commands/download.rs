@@ -2,6 +2,7 @@
 use crate::errors::PipError;
 use anyhow::{Result, anyhow};
 use std::path::Path;
+use pip_rs_core::{models, resolver, network};
 
 pub async fn handle_download(
     packages: Vec<String>,
@@ -42,7 +43,7 @@ pub async fn handle_download(
     // Parse requirements
     let mut parsed_reqs = Vec::new();
     for req_str in all_requirements {
-        match req_str.parse::<crate::models::Requirement>() {
+        match req_str.parse::<models::Requirement>() {
             Ok(req) => {
                 println!("  - {}", req.name);
                 parsed_reqs.push(req);
@@ -65,7 +66,7 @@ pub async fn handle_download(
 
     // Resolve dependencies
     println!("\nResolving dependencies...");
-    let mut resolver = crate::resolver::Resolver::new();
+    let mut resolver = resolver::Resolver::new();
     let resolved = resolver.resolve(parsed_reqs).await.map_err(|e| PipError::InstallationFailed {
         package: "dependencies".to_string(),
         reason: e.to_string(),
@@ -118,13 +119,13 @@ pub async fn handle_download(
 }
 
 /// Download a single package wheel
-async fn download_package(pkg: &crate::models::Package, dest_dir: &Path) -> Result<String> {
+async fn download_package(pkg: &models::Package, dest_dir: &Path) -> Result<String> {
     // Find wheel URL
-    let wheel_url = crate::network::find_wheel_url(&pkg.name, &pkg.version).await?;
+    let wheel_url = network::find_wheel_url(&pkg.name, &pkg.version).await?;
     
     // Download wheel
     eprintln!("  Downloading {} from {}", pkg.name, wheel_url);
-    let wheel_data = crate::network::PackageClient::new().download_package(&wheel_url).await?;
+    let wheel_data = network::PackageClient::new().download_package(&wheel_url).await?;
     
     // Extract filename from URL
     let filename = wheel_url

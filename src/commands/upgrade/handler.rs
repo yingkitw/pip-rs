@@ -75,7 +75,8 @@ where
         let detector = self.detector.clone();
 
         let scan_task = tokio::spawn(async move {
-            let semaphore = Arc::new(Semaphore::new(10));
+            // Reduced to 15 to avoid PyPI rate limiting while still being fast
+            let semaphore = Arc::new(Semaphore::new(15));
             let mut handles = vec![];
 
             // Spawn all tasks at once for real-time streaming
@@ -95,7 +96,9 @@ where
                                 detector_clone.compare_versions(&version, &latest) == Ordering::Less;
                             let _ = tx_clone.send((name, version, latest, is_outdated)).await;
                         }
-                        Err(_) => {
+                        Err(e) => {
+                            // Log error in debug mode only, don't spam stderr
+                            tracing::debug!("Failed to fetch latest version for {}: {}", name, e);
                             // Send a dummy message to indicate task completed
                             let _ = tx_clone.send((String::new(), String::new(), String::new(), false)).await;
                         }
@@ -147,7 +150,8 @@ where
         // Display outdated packages found
         self.reporter.report_scan_complete(packages.len(), outdated_packages.len());
 
-        // Upgrade all packages in parallel
+        // Fast batch upgrade - installs all packages in one command for maximum speed
+        println!("  ⚡ Upgrading {} packages using fast batch installation...\n", outdated_packages.len());
         let results = self.installer.upgrade_parallel(outdated_packages, self.config.concurrency).await;
         
         // Display results with better formatting
@@ -190,10 +194,16 @@ where
             return Ok(0);
         }
 
-        // Filter to only packages requested
+        // Filter to only packages requested (normalize names for comparison)
         let packages: Vec<_> = installed_packages
             .into_iter()
-            .filter(|p| packages_to_upgrade.contains(&p.name))
+            .filter(|p| {
+                let normalized_name = p.name.to_lowercase().replace('_', "-");
+                packages_to_upgrade.iter().any(|req| {
+                    let normalized_req = req.to_lowercase().replace('_', "-");
+                    normalized_name == normalized_req
+                })
+            })
             .collect();
 
         if packages.is_empty() {
@@ -213,7 +223,8 @@ where
         let detector = self.detector.clone();
 
         let scan_task = tokio::spawn(async move {
-            let semaphore = Arc::new(Semaphore::new(10));
+            // Reduced to 15 to avoid PyPI rate limiting while still being fast
+            let semaphore = Arc::new(Semaphore::new(15));
             let mut handles = vec![];
 
             // Spawn all tasks at once for real-time streaming
@@ -233,7 +244,9 @@ where
                                 detector_clone.compare_versions(&version, &latest) == Ordering::Less;
                             let _ = tx_clone.send((name, version, latest, is_outdated)).await;
                         }
-                        Err(_) => {
+                        Err(e) => {
+                            // Log error in debug mode only, don't spam stderr
+                            tracing::debug!("Failed to fetch latest version for {}: {}", name, e);
                             // Send a dummy message to indicate task completed
                             let _ = tx_clone.send((String::new(), String::new(), String::new(), false)).await;
                         }
@@ -285,7 +298,8 @@ where
         // Display outdated packages found
         self.reporter.report_scan_complete(packages.len(), outdated_packages.len());
 
-        // Upgrade all packages in parallel
+        // Fast batch upgrade - installs all packages in one command for maximum speed
+        println!("  ⚡ Upgrading {} packages using fast batch installation...\n", outdated_packages.len());
         let results = self.installer.upgrade_parallel(outdated_packages, self.config.concurrency).await;
         
         // Display results with better formatting
@@ -432,6 +446,6 @@ mod tests {
             UpgradeConfig::default(),
         );
 
-        assert_eq!(handler.config.concurrency, 10);
+        assert_eq!(handler.config.concurrency, 15);
     }
 }

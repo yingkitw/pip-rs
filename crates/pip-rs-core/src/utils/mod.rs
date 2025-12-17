@@ -12,4 +12,5 @@ pub mod requirements_parser;
 pub mod find_links_tracker;
 pub mod svn_handler;
 pub mod pep691_handler;
+pub mod progress;
 

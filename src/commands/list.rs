@@ -3,7 +3,7 @@ use anyhow::Result;
 use std::path::Path;
 use std::fs;
 use std::cmp::Ordering;
-use std::io::Write;
+use crate::utils::progress;
 
 #[derive(Debug, Clone)]
 struct Package {
@@ -149,12 +149,18 @@ pub async fn handle_list(outdated: bool) -> Result<i32, PipError> {
         use tokio::sync::Semaphore;
         use futures::future::join_all;
 
-        println!("\n📦 Checking for updates ({} packages)...\n", packages.len());
+        let total = packages.len();
+        
+        // Create progress bar (hidden in quiet mode)
+        let pb = if progress::is_quiet() {
+            None
+        } else {
+            Some(progress::progress_bar(total as u64, "Checking packages"))
+        };
 
         // Fetch latest versions in parallel (10 concurrent)
         let semaphore = Arc::new(Semaphore::new(10));
         let mut handles = vec![];
-        let total = packages.len();
 
         for (idx, pkg) in packages.iter_mut().enumerate() {
             let semaphore_clone = semaphore.clone();
@@ -164,10 +170,7 @@ pub async fn handle_list(outdated: bool) -> Result<i32, PipError> {
                 let _permit = semaphore_clone.acquire().await.ok();
                 match get_package_metadata(&pkg_name, "latest").await {
                     Ok(metadata) => Some((metadata.name, metadata.version, idx)),
-                    Err(e) => {
-                        eprintln!("Failed to fetch metadata for {}: {}", pkg_name, e);
-                        None
-                    }
+                    Err(_) => None,
                 }
             });
             handles.push(handle);
@@ -175,12 +178,9 @@ pub async fn handle_list(outdated: bool) -> Result<i32, PipError> {
 
         // Collect results with progress feedback
         let results = join_all(handles).await;
-        let mut checked = 0;
         for result in results.into_iter() {
-            checked += 1;
-            if checked % 50 == 0 || checked == total {
-                eprint!("\r  Checked {}/{} packages...", checked, total);
-                let _ = std::io::Write::flush(&mut std::io::stderr());
+            if let Some(prog) = &pb {
+                prog.inc(1);
             }
             
             if let Ok(Some((canonical_name, latest, idx))) = result {
@@ -188,7 +188,10 @@ pub async fn handle_list(outdated: bool) -> Result<i32, PipError> {
                 packages[idx].latest_version = Some(latest);
             }
         }
-        eprintln!("\r  Checked {}/{} packages...✓", total, total);
+        
+        if let Some(pb) = pb {
+            progress::finish_success(&pb, &format!("Checked {} packages", total));
+        }
 
         // Filter to only outdated packages
         packages.retain(|pkg| {

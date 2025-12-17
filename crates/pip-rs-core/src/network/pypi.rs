@@ -100,9 +100,11 @@ pub async fn get_package_releases(package_name: &str) -> Result<Vec<String>> {
     Ok(releases)
 }
 
-#[allow(dead_code)]
+/// Get the latest version from PyPI, bypassing cache for fresh data
+/// This is used for outdated checking to ensure we get current versions
 pub async fn get_latest_version(package_name: &str) -> Result<String> {
-    let info = super::GLOBAL_CLIENT.get_package_info(package_name).await?;
+    // Use fresh request to bypass cache - critical for accurate outdated detection
+    let info = super::GLOBAL_CLIENT.get_package_info_fresh(package_name).await?;
     
     let version = info["info"]["version"]
         .as_str()
@@ -156,4 +158,35 @@ pub async fn get_package_metadata(package_name: &str, version: &str) -> Result<P
     }
     
     Ok(package)
+}
+
+/// Batch fetch package metadata for multiple packages in parallel
+/// This improves performance by making concurrent requests
+pub async fn batch_get_package_metadata(
+    package_names: Vec<String>,
+) -> Result<Vec<(String, Result<Package>)>> {
+    use futures::future::join_all;
+    
+    let futures: Vec<_> = package_names
+        .iter()
+        .map(|name| {
+            let name = name.clone();
+            async move {
+                let result = get_package_metadata(&name, "latest").await;
+                (name, result)
+            }
+        })
+        .collect();
+    
+    let results = join_all(futures).await;
+    Ok(results)
+}
+
+/// Prefetch package metadata in the background
+/// This can be called to warm up the cache for commonly used packages
+pub async fn prefetch_packages(package_names: Vec<String>) {
+    // Spawn a background task to prefetch packages
+    tokio::spawn(async move {
+        let _ = batch_get_package_metadata(package_names).await;
+    });
 }

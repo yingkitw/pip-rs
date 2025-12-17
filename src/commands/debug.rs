@@ -1,5 +1,6 @@
 /// Debug command - display system and environment information
 use crate::errors::PipError;
+use crate::installer::SitePackages;
 
 pub async fn handle_debug() -> Result<i32, PipError> {
     println!("pip-rs debug information\n");
@@ -63,13 +64,16 @@ fn print_python_info() {
         println!("Python version: Not set");
     }
 
-    // Get site-packages location
-    match crate::installer::SitePackages::default() {
+    // Check site-packages
+    match SitePackages::default() {
         Ok(site_packages) => {
-            println!("Site-packages: {}", site_packages.path().display());
+            println!("\nSite Packages:");
+            for path in site_packages.get_all_directories() {
+                println!("  - {}", path.display());
+            }
         }
         Err(e) => {
-            println!("Site-packages: Error - {}", e);
+            println!("\nSite Packages: Error detection ({})", e);
         }
     }
 
@@ -110,7 +114,7 @@ fn print_pip_config() {
 }
 
 async fn print_installed_packages() -> Result<(), PipError> {
-    match crate::installer::SitePackages::default() {
+    match SitePackages::default() {
         Ok(site_packages) => {
             match site_packages.get_installed_packages() {
                 Ok(packages) => {
