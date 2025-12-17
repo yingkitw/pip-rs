@@ -4,7 +4,6 @@ use anyhow::Result;
 use std::cmp::Ordering;
 
 use super::detector::InstalledPackage;
-use super::conflict::VersionConflict;
 
 /// Trait for package detection
 #[async_trait]
@@ -45,15 +44,6 @@ pub trait ProgressReporter: Send + Sync {
     
     /// Report scanning complete
     fn report_scan_complete(&self, total: usize, outdated_count: usize);
-    
-    /// Report upgrade result
-    fn report_result(&self, result: &UpgradeResult);
-    
-    /// Report version conflict
-    fn report_conflict(&self, conflict: &VersionConflict);
-    
-    /// Report unmet dependencies
-    fn report_unmet_dependencies(&self, package: &str, dependencies: &[String]);
     
     /// Report final summary
     fn report_summary(&self, upgraded: usize, failed: usize);

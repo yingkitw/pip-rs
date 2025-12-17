@@ -102,6 +102,7 @@ pub async fn handle_lock(
     Ok(0)
 }
 
+#[allow(dead_code)]
 pub async fn handle_lock_install(
     lock_file: String,
 ) -> Result<i32, PipError> {
@@ -156,7 +157,9 @@ pub async fn handle_lock_install(
             }
         }
     }
-
+    
+    // Cleanup happens automatically when TempDir is dropped
+    
     println!("\nInstallation complete!");
     println!("  Successfully installed: {}", installed_count);
     if failed_count > 0 {
@@ -168,9 +171,10 @@ pub async fn handle_lock_install(
 }
 
 /// Install a single package by downloading and extracting its wheel
+#[allow(dead_code)]
 async fn install_package(pkg: &models::Package, temp_dir: &std::path::Path) -> Result<(), PipError> {
     // Find wheel URL
-    let wheel_url = network::find_wheel_url(&pkg.name, &pkg.version).await.map_err(|e| PipError::PackageNotFound {
+    let wheel_url = network::find_wheel_url(&pkg.name, &pkg.version).await.map_err(|_e| PipError::PackageNotFound {
         name: pkg.name.clone(),
         version: Some(pkg.version.clone()),
     })?;

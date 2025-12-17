@@ -3,6 +3,14 @@ use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::fs;
 
+#[derive(Debug, Clone)]
+pub struct PackageDetails {
+    pub name: String,
+    pub version: String,
+    pub location: PathBuf,
+    pub requires: Vec<String>,
+}
+
 pub struct SitePackages {
     path: PathBuf,
 }
@@ -190,14 +198,66 @@ impl SitePackages {
                     if let Some(name_str) = name.to_str() {
                         if name_str.ends_with(".dist-info") {
                             let pkg_name = name_str.trim_end_matches(".dist-info").to_string();
-                            packages.push(pkg_name);
+                            // Parse version from directory name if possible, or just use name
+                            // Actually, directory is usually name-version.dist-info
+                            if let Some(dash_pos) = pkg_name.find('-') {
+                                packages.push(pkg_name[..dash_pos].to_string());
+                            } else {
+                                packages.push(pkg_name);
+                            }
                         }
                     }
                 }
             }
         }
         
+        // Remove duplicates and sort
+        packages.sort();
+        packages.dedup();
+        
         Ok(packages)
+    }
+
+    pub fn get_package_details(&self, package_name: &str) -> Result<Option<PackageDetails>> {
+        for entry in fs::read_dir(&self.path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(name) = path.file_name() {
+                    let name_str = name.to_string_lossy();
+                    if name_str.ends_with(".dist-info") {
+                         let metadata_path = path.join("METADATA");
+                         if metadata_path.exists() {
+                             if let Ok(content) = fs::read_to_string(&metadata_path) {
+                                 let mut found_name = String::new();
+                                 let mut version = String::new();
+                                 let mut requires = Vec::new();
+                                 
+                                 for line in content.lines() {
+                                     if line.starts_with("Name: ") {
+                                         found_name = line["Name: ".len()..].trim().to_string();
+                                     } else if line.starts_with("Version: ") {
+                                         version = line["Version: ".len()..].trim().to_string();
+                                     } else if line.starts_with("Requires-Dist: ") {
+                                         requires.push(line["Requires-Dist: ".len()..].trim().to_string());
+                                     }
+                                 }
+                                 
+                                 if found_name.eq_ignore_ascii_case(package_name) {
+                                     return Ok(Some(PackageDetails {
+                                         name: found_name,
+                                         version,
+                                         location: self.path.clone(),
+                                         requires,
+                                     }));
+                                 }
+                             }
+                         }
+                    }
+                }
+            }
+        }
+        Ok(None)
     }
 }
 

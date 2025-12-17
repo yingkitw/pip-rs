@@ -2,26 +2,6 @@
 use std::process::Command;
 use super::traits::UpgradeResult;
 
-/// Get the installed version of a package
-fn get_installed_version(name: &str) -> Option<String> {
-    let output = Command::new("pip")
-        .args(&["show", name])
-        .output()
-        .ok()?;
-    
-    if !output.status.success() {
-        return None;
-    }
-    
-    let info = String::from_utf8_lossy(&output.stdout);
-    for line in info.lines() {
-        if line.starts_with("Version:") {
-            return Some(line.replace("Version:", "").trim().to_string());
-        }
-    }
-    None
-}
-
 /// Fast upgrade using pip-rs native installation (no subprocess overhead)
 pub async fn upgrade_package_fast(name: &str, _current: &str, latest: &str) -> UpgradeResult {
     // Use pip-rs native installation for maximum speed
@@ -131,49 +111,6 @@ pub async fn upgrade_packages_batch(
             upgrade_packages_parallel_pip(packages, 10).await
         }
     }
-}
-
-/// Upgrade multiple packages in parallel with bounded concurrency (fast native implementation)
-pub async fn upgrade_packages_parallel_fast(
-    packages: Vec<(String, String, String)>,
-    concurrency: usize,
-) -> Vec<UpgradeResult> {
-    use std::sync::Arc;
-    use tokio::sync::{Semaphore, Mutex};
-    use futures::future::join_all;
-
-    let semaphore = Arc::new(Semaphore::new(concurrency));
-    let total = packages.len();
-    let completed = Arc::new(Mutex::new(0usize));
-    let mut handles = vec![];
-
-    for (name, current, latest) in packages {
-        let sem = semaphore.clone();
-        let completed_clone = completed.clone();
-        let handle = tokio::spawn(async move {
-            let _permit = sem.acquire().await.ok();
-            let result = upgrade_package_fast(&name, &current, &latest).await;
-            
-            // Update progress
-            let mut count = completed_clone.lock().await;
-            *count += 1;
-            let current_count = *count;
-            drop(count);
-            
-            // Print progress every 10 packages or at the end
-            if current_count % 10 == 0 || current_count == total {
-                eprint!("\r  Upgraded {}/{} packages...", current_count, total);
-                let _ = std::io::Write::flush(&mut std::io::stderr());
-            }
-            
-            result
-        });
-        handles.push(handle);
-    }
-
-    let results = join_all(handles).await;
-    eprintln!("\r  Upgraded {}/{} packages...✓", total, total);
-    results.into_iter().filter_map(|r| r.ok()).collect()
 }
 
 /// Parallel upgrade using pip subprocess - reliable fallback

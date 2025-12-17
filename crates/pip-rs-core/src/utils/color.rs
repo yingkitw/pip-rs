@@ -1,6 +1,5 @@
 /// Color output utilities for CLI
-use colored::Colorize;
-use std::fmt;
+use colored::*;
 
 /// Color output configuration
 #[derive(Clone, Copy, Debug)]

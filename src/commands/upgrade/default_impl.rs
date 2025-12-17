@@ -1,8 +1,6 @@
 /// Default implementations of upgrade traits
 use super::traits::*;
 use super::detector::{self, InstalledPackage};
-use super::conflict::VersionConflict;
-use crate::network::get_package_metadata;
 use std::cmp::Ordering;
 use async_trait::async_trait;
 use anyhow::Result;
@@ -98,26 +96,6 @@ impl ProgressReporter for DefaultProgressReporter {
             println!("  ⚡ Starting fast batch upgrade...\n");
             println!("  {:<45} {:<15} {:<15} {:<12}", "Package", "Current", "Latest", "Status");
             println!("  {}", "-".repeat(90));
-        }
-    }
-    
-    fn report_result(&self, _result: &UpgradeResult) {
-        // Results are printed directly in handler, no need to print here
-    }
-    
-    fn report_conflict(&self, conflict: &VersionConflict) {
-        println!("  ⚠️  CONFLICT: {} {} → {} conflicts with {} {}", 
-            conflict.package, conflict.current_version, conflict.new_version,
-            conflict.conflicting_package, conflict.conflicting_version);
-        println!("      Reason: {}", conflict.reason);
-    }
-    
-    fn report_unmet_dependencies(&self, package: &str, dependencies: &[String]) {
-        if !dependencies.is_empty() {
-            println!("  ⚠️  UNMET DEPENDENCIES for {}:", package);
-            for dep in dependencies {
-                println!("      - {}", dep);
-            }
         }
     }
     

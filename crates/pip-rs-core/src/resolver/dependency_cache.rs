@@ -4,8 +4,8 @@
 /// redundant parsing and evaluation of package dependencies.
 
 use std::collections::HashMap;
-use crate::models::{Package, Requirement};
-use anyhow::Result;
+use crate::models::Requirement;
+
 
 /// Cached dependency information
 #[derive(Clone, Debug)]

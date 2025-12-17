@@ -5,7 +5,7 @@ pub mod installer;
 pub mod traits;
 pub mod default_impl;
 pub mod handler;
-pub mod conflict;
+
 
 use anyhow::Result;
 use crate::network::get_package_metadata;

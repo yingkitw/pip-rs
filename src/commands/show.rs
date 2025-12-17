@@ -1,39 +1,34 @@
 /// Show command implementation
 use crate::errors::PipError;
-use pip_rs_core::network;
+use pip_rs_core::installer::site_packages::SitePackages;
 
 pub async fn handle_show(package: &str) -> Result<i32, PipError> {
     println!("Fetching information for package: {}", package);
     
-    match network::get_package_metadata(package, "latest").await {
-        Ok(pkg) => {
-            println!("Name: {}", pkg.name);
-            println!("Version: {}", pkg.version);
-            if let Some(summary) = pkg.summary {
-                println!("Summary: {}", summary);
-            }
-            if let Some(home_page) = pkg.home_page {
-                println!("Home-page: {}", home_page);
-            }
-            if let Some(author) = pkg.author {
-                println!("Author: {}", author);
-            }
-            if let Some(license) = pkg.license {
-                println!("License: {}", license);
-            }
-            if !pkg.requires_dist.is_empty() {
-                println!("Requires:");
-                for req in pkg.requires_dist {
-                    println!("  - {}", req);
-                }
+    // Get site packages
+    let site_packages = SitePackages::default().map_err(|e| PipError::FileSystemError {
+        path: "site-packages".to_string(),
+        operation: "access".to_string(),
+        reason: e.to_string(),
+    })?;
+    
+    match site_packages.get_package_details(package) {
+        Ok(Some(info)) => {
+            println!("Name: {}", info.name);
+            println!("Version: {}", info.version);
+            println!("Location: {}", info.location.display());
+            if !info.requires.is_empty() {
+                println!("Requires: {}", info.requires.join(", "));
             }
             Ok(0)
         }
+        Ok(None) => {
+            eprintln!("Package '{}' not found", package);
+            Ok(1)
+        }
         Err(e) => {
-            Err(PipError::PackageNotFound {
-                name: package.to_string(),
-                version: None,
-            })
+            eprintln!("Error getting package info for '{}': {}", package, e);
+            Ok(1)
         }
     }
 }

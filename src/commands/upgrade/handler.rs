@@ -411,17 +411,6 @@ mod tests {
 
         fn report_scan_complete(&self, _total: usize, _outdated_count: usize) {}
 
-        fn report_result(&self, result: &UpgradeResult) {
-            self.results
-                .lock()
-                .unwrap()
-                .push(format!("{}: {}", result.name, result.success));
-        }
-
-        fn report_conflict(&self, _conflict: &super::super::conflict::VersionConflict) {}
-
-        fn report_unmet_dependencies(&self, _package: &str, _dependencies: &[String]) {}
-
         fn report_summary(&self, _upgraded: usize, _failed: usize) {}
     }
 

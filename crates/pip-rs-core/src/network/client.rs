@@ -24,11 +24,11 @@ impl PackageClient {
     pub fn with_trusted_hosts(trusted_hosts: Vec<String>) -> Self {
         // For trusted hosts, we need to disable certificate verification
         // Note: This is a security consideration - trusted hosts bypass SSL verification
-        let mut client_builder = Client::builder()
+        let client_builder = Client::builder()
             .timeout(Duration::from_secs(30))  // Reduced from 180s for faster failure
             .connect_timeout(Duration::from_secs(10))  // Reduced from 30s
             .pool_max_idle_per_host(20)  // Increased connection pool for better reuse
-            .user_agent("pip-rs/1.0");  // Add user agent to help with rate limiting
+            .user_agent(format!("pip-rs/{}", env!("CARGO_PKG_VERSION")));  // Add user agent to help with rate limiting
         
         // If we have trusted hosts, we may need to disable cert verification
         // However, reqwest doesn't support per-host cert verification easily

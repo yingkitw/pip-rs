@@ -146,9 +146,9 @@ pub async fn handle_install(
             Ok(_) => {
                 installed_count += 1;
             }
-            Err(e) => {
+            Err(_e) => {
                 if !progress::is_quiet() {
-                    eprintln!("✗ Failed to install {} {}: {}", pkg.name, pkg.version, e);
+                    eprintln!("✗ Failed to install {} {}: {}", pkg.name, pkg.version, _e);
                 }
                 failed_count += 1;
             }
@@ -179,7 +179,7 @@ async fn install_package(pkg: &models::Package, temp_dir: &Path) -> Result<(), P
     // Find wheel URL
     let wheel_url = network::find_wheel_url(&pkg.name, &pkg.version)
         .await
-        .map_err(|e| PipError::PackageNotFound {
+        .map_err(|_e| PipError::PackageNotFound {
             name: pkg.name.clone(),
             version: Some(pkg.version.clone()),
         })?;
